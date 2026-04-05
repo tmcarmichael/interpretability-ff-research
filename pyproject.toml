@@ -1,7 +1,7 @@
 [project]
 name = "nn-observability"
 version = "0.1.0"
-description = "Toward dual-path architectures for neural network observability."
+description = "Neural network observability research. Learned binary observer heads on frozen activations recover decision-quality signal independent of output confidence."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Thomas Carmichael"}]
@@ -15,6 +15,12 @@ dependencies = [
     "torchvision>=0.17.0",
 ]
 
+[project.optional-dependencies]
+transformer = [
+    "transformers>=4.40.0",
+    "datasets>=2.18.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
@@ -23,6 +29,10 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+filterwarnings = [
+    "ignore:var\\(\\).*degrees of freedom:UserWarning",
+    "ignore::scipy.stats.ConstantInputWarning",
+]
 
 [tool.ruff]
 line-length = 110
@@ -44,7 +54,7 @@ ignore = [
 max-complexity = 25
 
 [tool.ruff.lint.isort]
-known-first-party = ["train", "observe", "scale"]
+known-first-party = ["train", "observe", "scale", "observer_variants", "seed_agreement", "inspect_weights", "transformer_observe"]
 
 [tool.ruff.format]
 quote-style = "double"

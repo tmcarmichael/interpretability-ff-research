@@ -1,4 +1,4 @@
-# Toward Dual-Path Architectures for Neural Network Observability
+# Learned Observers Recover Decision-Quality Signal from Frozen Activations
 # Run `just` to see all available recipes
 
 set dotenv-load := false
@@ -35,6 +35,42 @@ observe-aux dataset="mnist" seeds=default_seeds epochs=default_epochs device=def
 observe-denoise dataset="mnist" seeds=default_seeds epochs=default_epochs device=default_device:
     uv run src/observe.py --mode denoise --dataset {{dataset}} --epochs {{epochs}} --seeds {{seeds}} --device {{device}}
 
+# Phase 4: observer head variant sweep (linear/MLP, regression/binary)
+observer-variants device=default_device:
+    uv run src/observer_variants.py
+
+# Phase 4: cross-seed ranking agreement test
+seed-agreement device=default_device:
+    uv run src/seed_agreement.py
+
+# Phase 4: weight vector analysis for linear binary heads
+inspect-weights device=default_device:
+    uv run src/inspect_weights.py
+
+# Phase 5a: GPT-2 124M observer heads (direct replication)
+transformer seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --seeds {{seeds}} --device {{device}}
+
+# Phase 5b: layer sweep across all 12 GPT-2 layers
+transformer-sweep seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --layer-sweep --seeds {{seeds}} --device {{device}}
+
+# Phase 5c: hand-designed baselines on GPT-2
+transformer-baselines seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --baselines --seeds {{seeds}} --device {{device}}
+
+# Phase 5d: intervention (neuron ablation) on GPT-2
+transformer-intervention seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --intervention --seeds {{seeds}} --device {{device}}
+
+# Phase 5e: full-output control (layer 8 vs layer 11 predictor)
+transformer-output-control seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --output-control --seeds {{seeds}} --device {{device}}
+
+# Phase 5: all transformer experiments (5a-5e)
+transformer-all seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --all --seeds {{seeds}} --device {{device}}
+
 # Run all experiments (alias for reproduce)
 all device=default_device:
     just reproduce {{device}}
@@ -55,6 +91,10 @@ reproduce device=default_device:
     just observe mnist 3 50 {{device}}
     just observe-aux mnist 3 50 {{device}}
     just observe-denoise mnist 3 50 {{device}}
+    just observer-variants {{device}}
+    just seed-agreement {{device}}
+    just inspect-weights {{device}}
+    just transformer-all 3 {{device}}
 
 # Lint source files
 lint:

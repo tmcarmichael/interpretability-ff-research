@@ -1,14 +1,14 @@
-# Toward Dual-Path Architectures for Neural Network Observability
+# Learned Observers Recover Decision-Quality Signal from Frozen Activations
 
-Can a neural network's internal structure tell you something about its decisions that output confidence does not? This project tests that question systematically: compare representations under different training rules, then try to read decision-quality signals from BP activations using passive observers and co-training.
+Can a neural network's internal activations tell you something about its decisions that output confidence does not? This project tests that question through a controlled experimental arc: first establishing that hand-designed activation statistics fail under proper controls, then showing that learned linear projections with binary supervision succeed, and finally demonstrating that the finding transfers from MLPs to transformers.
 
-**Thesis:** Passive hand-designed observers fail to read decision-quality signal from BP activations beyond confidence. But supervised observer heads on frozen activations succeed: binary-trained linear projections recover stable independent signal (partial correlation +0.28, seed agreement +0.36). The bottleneck was the observer learning objective, not the absence of readable structure.
+**Thesis:** Frozen neural network activations contain decision-quality signal independent of output confidence, but no hand-designed statistic recovers it. Learned linear projections with binary supervision do. This finding transfers from MLPs to transformers with no loss in signal strength and a qualitative gain in stability (partial correlation +0.283, seed agreement +0.99 on GPT-2 124M). The bottleneck was the observer learning objective, not the absence of readable structure.
 
 ## At a glance
 
-**Core question:** Can internal structure in standard BP models be read in a way that adds information beyond output confidence?
+**Core question:** Can frozen neural network activations be read in a way that adds information beyond output confidence?
 
-**Current answer:** Yes. Frozen BP activations contain independent signal beyond confidence, but hand-designed statistics can't find it. A learned linear projection with binary supervision recovers a stable direction in activation space correlated with residual error.
+**Current answer:** Yes. Frozen activations contain independent signal beyond confidence, but hand-designed statistics can't find it. A learned linear projection with binary supervision recovers it. This transfers from MLPs to transformers: on GPT-2 124M, three independent observer initializations converge to the same ranking of 84,650 token positions (seed agreement +0.99).
 
 | Phase | Question | Result | Takeaway |
 |---|---|---|---|
@@ -17,15 +17,17 @@ Can a neural network's internal structure tell you something about its decisions
 | **Phase 2b** | Can co-training rescue the observer? | **Weakly** | Denoising produced a small positive partial correlation (+0.07), but with much weaker raw predictive utility. |
 | **Phase 3** | Do alternative hand-designed observers work? | **No** | All passive structural observers collapse to near-zero partial correlation under proper controls. |
 | **Phase 4** | Can a learned observer head recover signal? | **Yes** | Binary-trained linear heads on frozen BP activations: partial corr +0.28, seed agreement +0.36. |
+| **Phase 5** | Does this transfer to transformers? | **Yes** | On frozen GPT-2 124M: partial corr +0.283 +/- 0.001, seed agreement +0.99. Signal peaks at layer 8 of 12. Layer 8 retains +0.099 after controlling for the full output distribution. |
 
 **Key findings:**
 
-- FF changes representation structure in real, confounder-controlled ways.
-- Hand-designed passive observers (energy, sparsity, entropy, prototype similarity) all fail under partial correlation controls.
-- Learned observer heads on frozen BP activations recover stable independent signal. Binary supervision materially improves both partial correlation and seed agreement over regression targets.
-- Most of the signal is linearly accessible. The missed direction was a learnable projection, not nonlinear structure.
+- Hand-designed activation statistics (energy, sparsity, entropy, prototype similarity) all collapse to near-zero partial correlation after controlling for output confidence. This holds on both MLPs and transformers.
+- Binary supervision is the unlock. Regression-trained observer heads find signal but disagree across seeds. Binary heads (predict residual sign) produce both stronger partial correlation and stable convergence.
+- The signal is linearly accessible. A learned linear projection recovers ~91% of what an MLP head finds. Phase 3 tested four specific linear directions and the informative one is a different combination entirely.
+- On GPT-2 124M, the signal peaks at layer 8 of 12. After controlling for the best possible output-derived prediction (a learned layer 11 predictor), layer 8 retains +0.099 partial correlation. This is not early access to output information. It is a different signal that the output does not carry.
+- FF induces real structural differences (sparser, lower-rank representations) independent of confounders, but these structural properties do not translate to per-example observability.
 
-**Bottom line:** The signal is present in frozen activations, but the hand-designed observers tested in Phases 2-3 failed to recover it. Learned binary observer heads find stable independent projections. The next test is whether this transfers to transformers.
+**Bottom line:** Frozen transformer activations contain decision-quality signal independent of output confidence. No standard activation statistic finds it. A learned linear binary projection does, three independent initializations converge to the same answer, and mid-layer signal carries information the output distribution does not.
 
 ## Why this matters
 
@@ -33,14 +35,14 @@ Most deployed "observability" systems train binary classifiers on activations to
 
 This matters because unfaithful probes are evadable. Models can maintain identical input-output behavior while rearranging activations into subspaces that defeat monitors. A faithful observer that reads causal structure should be harder to evade, because the model can't rearrange its causal computation without changing its outputs.
 
-This project tests the harder question: can you learn anything from activations that output confidence doesn't already tell you? The partial correlation methodology (controlling for logit margin and activation norm) is the key distinction. Every phase applies this control, which is why the headline numbers are small. They measure the independent component, not the total correlation.
+This project tests the harder question: can you learn anything from activations that output confidence doesn't already tell you? The partial correlation methodology (controlling for output confidence and activation norm) is the key distinction. On MLPs, the confidence control is logit margin; on transformers, max softmax probability. Every phase applies this control, which is why the headline numbers are small. They measure the independent component, not the total correlation.
 
 The results split "observability" into two problems that behave differently.
 
-- **Per-example monitoring** (does the observer flag likely errors on individual inputs?) fails under passive hand-designed readouts. But learned observer heads on frozen activations recover stable signal (Phase 4). The problem was not absence of information but absence of the right projection.
+- **Per-example monitoring** (does the observer flag likely errors on individual inputs?) fails under passive hand-designed readouts. But learned observer heads on frozen activations recover stable signal (Phases 4-5). The problem was not absence of information but absence of the right projection and the right training target.
 - **Neuron-level causal targeting** (does the observer identify neurons whose removal disproportionately harms performance?) works with simple statistics. FF-derived signals and magnitude rankings pick out causally important neurons, even though they fail as per-example monitors.
 
-The practical implication: per-example observability requires learning the right projection from activations, not just computing hand-designed statistics. The next question is whether the learned projections that work on MLPs have analogs in transformer residual streams.
+The practical implication: per-example observability requires learning the right projection from activations, not computing hand-designed statistics. This holds across architectures. The learned projections that work on MLPs transfer to GPT-2 124M with no loss in signal strength and near-perfect stability across initializations.
 
 ### The faithfulness bar
 
@@ -125,7 +127,7 @@ Two co-training formulations tested, both using `sum(h²)` as the observer:
 
 - **Denoising auxiliary** (BP + FF contrastive loss with noise corruption, no overlay). ff_goodness partial correlation: **+0.070** (p < 0.001). AUC dropped from 0.923 to 0.688: denoising decoupled goodness from confidence without replacing the lost predictive utility.
 
-Denoising co-training produced the only positive significant partial correlation in the project (+0.070). The cost: raw error-detection AUC dropped from 0.923 to 0.688, while max softmax on the same model maintained 0.947. The denoising objective successfully decoupled goodness from confidence but did not replace the lost information. This is the foothold for Phase 4: explicit shaping moved the partial correlation from negative to positive, suggesting that observability may be trainable even though it is not passively readable.
+Denoising co-training produced the first positive significant partial correlation in the project (+0.070). The cost: raw error-detection AUC dropped from 0.923 to 0.688, while max softmax on the same model maintained 0.947. The denoising objective decoupled goodness from confidence but did not replace the lost information. This was the foothold for Phase 4: explicit shaping moved the partial correlation from negative to positive, suggesting that observability is trainable even though it is not passively readable.
 
 ### Intervention
 
@@ -161,7 +163,7 @@ All partial correlations are near zero or negative after controlling for logit m
 
 Phase 3 showed hand-designed observers fail. Phase 4 asks: can a trained function extract what passive statistics miss?
 
-A small observer head is trained on frozen BP activations to predict per-example loss residuals (the component of loss not explained by logit margin and activation norm). Four variants tested across 3 seeds:
+A small observer head is trained on frozen BP activations. Four variants cross two axes: architecture (linear vs. MLP) and target (regression on continuous loss residuals vs. binary classification of residual sign). Three seeds each:
 
 | Variant | Partial corr | Seed agreement | Architecture |
 |---|---|---|---|
@@ -179,23 +181,84 @@ Most of the signal is linearly accessible. Linear binary (+0.276) captures ~91% 
 
 The three linear binary heads (one per seed) have orthogonal weight vectors (pairwise cosine similarity ~0.01) and zero top-neuron overlap (0/20 shared between seeds 42 and 43). Yet their example rankings correlate moderately (+0.30 to +0.45). Different projections through activation space produce correlated scores because the informative property is not a single direction. It is a distributed geometric property of the activation manifold that multiple linear projections can partially recover.
 
-Weight mass is spread across 250+ of 500 neurons (not concentrated in a few), and the learned directions are orthogonal to the uniform vector (cosine < 0.1), ruling out activation energy as the underlying signal. The observer signal is subspace-like: each seed finds a different functionally useful projection of the same underlying activation geometry.
+Weight mass is spread across 250+ of 500 neurons (not concentrated in a few), and the learned directions are orthogonal to the uniform vector (cosine < 0.1), ruling out activation energy as the underlying signal. On MLPs, where each seed trains a different BP model, the observer signal is subspace-like: each seed finds a different functionally useful projection of different underlying geometry. Phase 5a reveals that this instability was a property of varying models, not of the signal itself. On a fixed pretrained transformer, three initializations converge to the same projection (seed agreement +0.99).
 
-### Phase 5: transformer transfer (planned)
+## Phase 5: transformer transfer (complete)
 
-Linear binary observer heads are the primary candidate for GPT-2 124M validation. The methodology (partial correlations after controlling for output-derived baselines) transfers directly. The question is whether the geometric property discovered on MLP activations has an analog in transformer residual streams.
+Does the Phase 4 finding survive the MLP-to-transformer jump? Pretrained GPT-2 124M (frozen), WikiText-103, linear binary observer heads at every layer.
+
+### Phase 5a: direct replication (positive)
+
+Linear binary observer heads on frozen GPT-2 124M residual streams, 3 seeds, 84,650 token positions:
+
+|                | MLP (Phase 4)    | GPT-2 124M (Phase 5a) |
+|----------------|------------------|-----------------------|
+| Partial corr   | +0.276 +/- 0.070 | +0.283 +/- 0.001      |
+| Seed agreement | +0.36            | +0.99                 |
+
+The partial correlation is nearly identical. The seed agreement jumped from +0.36 to +0.99. On a fixed pretrained model, different observer head initializations converge to essentially the same ranking. The signal is not a per-seed artifact. It is one stable direction in the residual stream.
+
+The MLP instability (Phase 4, +0.36 agreement) was from comparing across different trained models. Different seeds produced different BP models with different activation geometry. On GPT-2, the activations are fixed and the learned projection is near-deterministic.
+
+### Phase 5b: layer sweep
+
+The observer signal exists at every layer, starting at +0.19 (layer 0) and peaking at layer 8 (+0.290). The profile is monotonically increasing through layer 8, then plateaus through layer 11 (+0.283). Full per-layer data in `results/transformer_observe.json`.
+
+The peak at layer 8, not layer 11, means the observer is reading compositional structure formed during the middle-to-late layers, not the output distribution taking shape at the final layer. The decision-quality information is fully formed three layers before the model commits to a prediction.
+
+### Phase 5c: hand-designed baselines (negative)
+
+The Phase 3 negative result replicates on transformers. All hand-designed statistics collapse under partial correlation controls:
+
+| Observer              | Partial corr (GPT-2, layer 11) |
+|-----------------------|---------------------------------|
+| ff_goodness           | -0.010                          |
+| active_ratio          | -0.057                          |
+| act_entropy           | -0.110                          |
+| activation_norm       | -0.002                          |
+| Learned linear binary | **+0.283**                      |
+
+The gap between hand-designed and learned observers is not an MLP quirk. It is an architecture-general property: the decision-quality signal in frozen activations is invisible to standard statistics and recoverable only by a learned projection with the right training target.
+
+### Phase 5d: intervention (inconclusive)
+
+Observer-guided ablation of MLP intermediate neurons at layer 8, compared against magnitude-guided and random ablation:
+
+| Fraction ablated | Observer | Magnitude | Random |
+|---|---|---|---|
+| 0% | 4.97 | 4.97 | 4.97 |
+| 10% | 5.03 | 4.94 | 4.97 |
+| 30% | 4.98 | 5.01 | 4.99 |
+| 50% | 5.05 | 4.94 | 4.94 |
+
+No strategy produces meaningful loss increase. Layer 8's MLP is robust to ablation of up to 50% of its 3072 intermediate neurons regardless of which neurons are removed. The residual stream architecture buffers MLP damage through skip connections. The causal question remains open, not answered negatively.
+
+### Phase 5e: full-output control (positive)
+
+The critical test: is the layer 8 signal early access to output information, or a different signal that the output doesn't carry? A small MLP trained on the layer 11 residual stream serves as the strongest possible output-derived baseline. The layer 8 observer is then evaluated after partialling out this predictor.
+
+|         | Standard controls | + Layer 11 predictor |
+|---------|-------------------|----------------------|
+| Seed 42 | +0.294            | +0.111               |
+| Seed 43 | +0.287            | +0.093               |
+| Seed 44 | +0.287            | +0.094               |
+| Mean    | +0.290            | **+0.099 +/- 0.008** |
+
+The layer 11 predictor absorbs about two-thirds of the signal. But +0.099 survives, consistent across all three seeds. Layer 8 contains decision-quality information that is not recoverable from the model's output distribution. This is not early access to the same signal. It is a different signal, one that is lost or transformed by the time the model produces logits three layers later.
+
+This changes the framing from monitoring (read internal state for signals the output already carries) to observability (read internal state for signals the output does not carry at all).
 
 ## Limitations
 
-- Small scale (MLPs on MNIST/CIFAR-10). Results may not transfer to transformers or billion-parameter models.
+- Tested on GPT-2 124M. Whether the signal persists, strengthens, or vanishes at billion-parameter scale is unknown.
 - No SAE comparison. The most important missing baseline.
 - No circuit discovery or feature visualization. Statistical proxies only.
 - Hyperparameters not swept (FF lr=0.03, BP lr=0.001, auxiliary weight=0.1 based on convention).
-- Intervention tests identify causally important neurons but do not provide independent per-example monitoring.
+- Intervention on GPT-2 is inconclusive due to MLP robustness at layer 8. The causal link between observer-weighted neurons and model decisions is established on MLPs but not on transformers.
 
 ## What this is not
 
-This is not a claim that FF is better than BP, or that FF should replace BP, or that FF is the right observability objective. FF is one instance of a local, layer-wise training signal that served as the starting point for a controlled investigation of what makes internal representations readable. The main finding is that learned observer heads recover signal that hand-designed statistics miss, and that the informative structure is a distributed geometric property rather than a single interpretable feature. The remaining question is whether this transfers to transformer architectures.
+This is not a claim that FF is better than BP, or that FF should replace BP, or that FF is the right observability objective. FF is one instance of a local, layer-wise training signal that served as the starting point for a controlled investigation of what makes internal representations readable. The main finding is that learned observer heads recover signal that hand-designed statistics miss, and that this transfers from MLPs to transformers. On MLPs with varying trained models, the informative structure appears distributed across multiple directions. On a fixed pretrained transformer, it converges to a single stable projection. The remaining questions are whether the signal persists at larger scale and whether observer-guided interventions on transformers confirm the causal link established on MLPs.
 
 ## How to run
 
@@ -219,18 +282,28 @@ just scale                  # Phase 1: scaling study, 5 model sizes
 just observe                # Phase 2: observer faithfulness test
 just observe-aux            # Phase 2b: auxiliary co-training variant
 just observe-denoise        # Phase 2b: denoising co-training variant
+just observer-variants      # Phase 4: head variant sweep
+just seed-agreement         # Phase 4: cross-seed agreement test
+just inspect-weights        # Phase 4: weight vector analysis
+just transformer            # Phase 5a: GPT-2 124M observer heads
+just transformer-sweep      # Phase 5b: layer sweep (all 12 layers)
+just transformer-baselines  # Phase 5c: hand-designed baselines on GPT-2
+just transformer-intervention # Phase 5d: neuron ablation intervention
+just transformer-output-control # Phase 5e: full-output control
+just transformer-all        # Phase 5: all transformer experiments (5a-5e)
 ```
 
-Results go to `results/`. Phase 1 charts are generated by `analyze.ipynb`. Phase 2 generates intervention dose-response plots in `assets/`.
+Results go to `results/`. Phase 1 charts are generated by `analyze.ipynb`. Phase 2 generates intervention dose-response plots in `assets/`. Phase 5 requires the `transformer` dependency group (installed automatically by `uv run --extra transformer`).
 
 ## Repo structure
 
 - `src/train.py` Phase 1: trains FF, BP, and ablation variants, computes confounder-controlled metrics
 - `src/scale.py` Phase 1: scaling study across 5 model sizes
-- `src/observe.py` Phases 2-4: observer faithfulness testing, learned observer heads
+- `src/observe.py` Phases 2-3: observer faithfulness testing, co-training variants
 - `src/observer_variants.py` Phase 4: observer head variant sweep (linear/MLP, regression/binary)
 - `src/seed_agreement.py` Phase 4: cross-seed ranking agreement test
 - `src/inspect_weights.py` Phase 4: weight vector analysis for linear binary heads
+- `src/transformer_observe.py` Phase 5: GPT-2 124M observer heads, layer sweep, baselines
 - `analyze.ipynb` generates Phase 1 figures and analysis from result JSON files
 - `results/` result data (JSON, committed)
 - `assets/` generated charts (committed for README)
@@ -239,13 +312,14 @@ Results go to `results/`. Phase 1 charts are generated by `analyze.ipynb`. Phase
 
 | Paper                                                                                 | Relevance                                                                       |
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [The Forward-Forward Algorithm (Hinton, 2022)](https://arxiv.org/abs/2212.13345)      | Local, layer-wise training without backpropagation                              |
+| [Production-Ready Probes for Gemini (Kramár et al., 2026)](https://arxiv.org/abs/2601.11516) | Google deployed activation probes at scale; found fragility to distribution shifts |
+| [Neural Chameleons (McGuinness et al., 2025)](https://arxiv.org/abs/2512.11949)       | Models can learn to evade activation monitors while preserving behavior         |
+| [GAVEL: Rule-Based Activation Monitoring (Rozenfeld et al., 2026)](https://arxiv.org/abs/2601.19768) | Composable predicate rules over activation-derived features (ICLR 2026)        |
+| [Beyond Linear Probes / TPCs (Oldfield et al., 2026)](https://arxiv.org/abs/2509.26238) | Adjustable-overhead runtime probes with adaptive cascades (ICLR 2026)          |
+| [The Forward-Forward Algorithm (Hinton, 2022)](https://arxiv.org/abs/2212.13345)      | Local, layer-wise training without backpropagation; starting point for Phase 1  |
 | [Fractured Entangled Representations (2025)](https://arxiv.org/abs/2505.11581)        | BP+SGD produces entangled representations; alternative optimization does not    |
 | [Limits of AI Explainability (2025)](https://arxiv.org/abs/2504.20676)                | Proves global interpretability is impossible; local explanations can be simpler |
 | [Infomorphic Networks (PNAS, 2025)](https://www.pnas.org/doi/10.1073/pnas.2408125122) | Local learning rules produce inherently interpretable representations           |
-| [Scalable FF (ICML 2025)](https://arxiv.org/abs/2501.03176)                           | Block-local hybrids outperform pure BP                                          |
-| [Contrastive FF for ViT (2025)](https://arxiv.org/abs/2502.00571)                     | FF applied to transformers, small performance gap vs BP                         |
-| [Deep-CBN Hybrid (2025)](https://www.nature.com/articles/s41598-025-92218-y)          | FF+BP hybrid exceeds prior baselines in molecular prediction                    |
 | [Inference-Time Intervention (2023)](https://arxiv.org/abs/2306.03341)                | Precedent for inference-time activation monitoring and steering                 |
 
 ## License
