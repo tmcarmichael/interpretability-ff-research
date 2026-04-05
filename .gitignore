@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[oc]
+*.egg-info
+build/
+dist/
+
+# Virtual environments
+.venv
+venv/
+
+# System
+.DS_Store
+
+# Data (downloaded by torchvision)
+data/
+src/data/
+
+# Large artifacts
+*.pt
+*.pth
+*.bin
+*.safetensors
+checkpoints/
+
+# Results data (JSON is small, committed; large arrays are not)
+results/**/*.npy
+results/**/*.pkl
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+CLAUDE.md
+.claude/
+
+# Generated charts (reproducible via analyze.ipynb)
+*.png
+!assets/*.png
+
+# Internal review
+review/

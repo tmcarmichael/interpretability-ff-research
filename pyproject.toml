@@ -1,0 +1,51 @@
+[project]
+name = "nn-observability"
+version = "0.1.0"
+description = "Toward dual-path architectures for neural network observability."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Thomas Carmichael"}]
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.8.0",
+    "numpy>=1.26.0",
+    "scikit-learn>=1.4.0",
+    "scipy>=1.12.0",
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.15",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "UP", "B", "C90"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "E701",   # multiple statements on one line (colon) — compact research code style
+    "E702",   # multiple statements on one line (semicolon) — same
+    "E741",   # ambiguous variable names (l, x, y) — math code
+    "B006",   # mutable default args — false positives with lists in signatures
+    "B905",   # zip() without strict= — paired iterators always match in this codebase
+    "UP007",  # X | Y union syntax
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 25
+
+[tool.ruff.lint.isort]
+known-first-party = ["train", "observe", "scale"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
