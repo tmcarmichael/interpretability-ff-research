@@ -26,13 +26,13 @@ This project builds to that conclusion through nine phases, each motivated by th
 | **Phase 5** | Does this transfer to transformers? | **Yes** | On frozen GPT-2 124M: partial corr +0.282 +/- 0.001, seed agreement +0.99. Signal peaks at layer 8 of 12. Layer 8 retains +0.099 after a strong output-side control (MLP on last-layer activations). |
 | **Phase 6** | Does the signal catch errors confidence misses? | **Yes** | At 10% flag rate, the layer 8 observer catches 4,368 high-loss tokens (5.2% of test set) that output confidence does not flag. |
 | **Phase 7** | How does this compare to SAE-based probes? | **Raw observer wins** | A 768-dim linear observer outperforms a 24,576-feature SAE probe (+0.290 vs +0.255 partial corr). Combining all three channels catches substantially more errors than any single channel. |
-| **Phase 8** | Does the signal persist across model scale? | **Yes** | Partial corr +0.279 to +0.290 across GPT-2 124M to 1.5B. Output-independent component increases from +0.099 to +0.174 across this scaling curve. Seed agreement 0.88-0.95. Peak at roughly two-thirds depth throughout. |
+| **Phase 8** | Does the signal persist across model scale? | **Yes** | Partial corr +0.279 to +0.290 across GPT-2 124M to 1.5B. Output-independent component increases from +0.099 to +0.174 across this scaling curve. Seed agreement 0.88-0.95. Peak at roughly two-thirds depth within GPT-2. |
 | **Phase 9** | Does the signal replicate outside GPT-2? | **Yes** | Qwen 2.5 1.5B (+0.284) and Llama 3.2 1B (+0.250) both replicate. Output-controlled residuals positive in both. Hand-designed baselines collapse across all families. |
 
 **Key findings:**
 
 - **The bottleneck is the training target, not the architecture.** Binary supervision (predict whether loss residual is positive) produces both stronger signal and stable convergence. Regression on continuous residuals finds signal but disagrees across seeds. Linear heads recover ~91% of what MLP heads find. Phase 3's four hand-designed directions all fail; the informative direction is a different learned combination entirely.
-- **The signal is partially independent of output information.** On GPT-2 124M, the signal peaks at layer 8 of 12. After controlling for a trained MLP on last-layer activations (a strong output-side predictor), the peak layer retains +0.099 partial correlation. This is not early access to what the model will output. It is information that the output-side predictor does not capture. Across the GPT-2 scaling curve, the output-independent component increases: +0.099 (124M), +0.103 (355M), +0.164 (774M), +0.174 (1.5B). Total signal strength stays flat.
+- **The apparent gap beyond output confidence has identifiable structure.** About 48% of the raw signal is confidence, 16% is distributional shape (entropy), 7% is geometric typicality, and 6% is token frequency. The remaining ~23% resists all tested controls and lives in the low-variance subspace of the activation manifold. The output-independent component builds monotonically through mid-layer computation and partially collapses at the output layer. Across the GPT-2 scaling curve, this component increases: +0.099 (124M), +0.103 (355M), +0.164 (774M), +0.174 (1.5B).
 - **Multiple channels catch different errors.** At 10% flag rate, the observer catches 4,368 high-loss tokens confidence misses. An SAE probe catches a different 4,527. Each channel flags thousands of errors the others miss entirely. No single monitoring signal is sufficient.
 - FF induces real structural differences (sparser, lower-rank representations) independent of confounders, but these structural properties do not translate to per-example observability.
 
@@ -59,7 +59,7 @@ Observability was evaluated against three tests.
 
 - **Correlation.** Does the observer signal track decision-relevant metrics beyond what cheap baselines capture? *Passed across scale and families.* Partial correlation +0.250 to +0.290 across GPT-2, Qwen, and Llama, after controlling for confidence and activation norm (Phases 4-5, 8-9).
 - **Prediction.** Can the observer rank likely failures in a way that complements output confidence? *Passed on GPT-2 124M.* 4,368 exclusive high-loss catches at 10% flag rate (Phase 6). Three-channel monitoring catches substantially more errors than any single channel (Phase 7). Not yet tested at larger model sizes.
-- **Intervention.** Does observer-guided ablation degrade performance faster than random? *Passed on MLPs* (Phase 2 intervention). *Partial on transformers* (Phase 5f). Neuron ablation was inconclusive due to residual stream buffering (Phase 5d). Directional ablation shows weak but bidirectional causal evidence: removing the observer direction causes monotonic loss increase, and amplifying it preferentially helps observer-flagged tokens (3x targeting ratio). The observer direction is functionally relevant but not a dominant causal axis of output formation.
+- **Intervention.** Does removing the signal degrade performance? *Partial on transformers* (Phase 5f). Neuron ablation was inconclusive due to residual stream buffering (Phase 5d). Directional ablation shows weak but bidirectional causal evidence: removing the observer direction causes monotonic loss increase, and amplifying it preferentially helps observer-flagged tokens (3x targeting ratio). The observer direction is functionally relevant but not a dominant causal axis of output formation. (Phase 2 showed FF-targeted neuron ablation is more destructive than random on MLPs, but that is a different setup from the learned observer head.)
 
 ## Phase 1: structural comparison (complete)
 
@@ -179,7 +179,7 @@ The MLP instability (Phase 4, +0.36 agreement) was from comparing across differe
 
 The observer signal exists at every layer, starting at +0.19 (layer 0) and peaking at layer 8 (+0.290). The profile increases monotonically through layer 8, then declines slightly through layers 9-11 (0.285, 0.278, 0.282). Full per-layer data in `results/transformer_observe.json`.
 
-The peak at layer 8, not layer 11, means the observer is reading compositional structure formed during the middle-to-late layers, not the output distribution taking shape at the final layer. The decision-quality information is fully formed three layers before the model commits to a prediction.
+The peak at layer 8, not layer 11, means the probe recovers the strongest signal from mid-to-late layers rather than from the output distribution taking shape at the final layer. The probe's peak occurs well before the model commits to a prediction.
 
 ### Phase 5c: hand-designed baselines (negative)
 
@@ -269,7 +269,7 @@ Does a sparse autoencoder feature basis recover the same signal? Using Joseph Bl
 | Raw linear binary | +0.290 | +0.92 | 768 |
 | SAE linear binary | +0.255 | +0.94 | 24,576 |
 
-The raw residual stream outperforms the SAE decomposition by 12%. SAE compression loses signal. The interpretable feature basis is not aligned with decision quality. A 768-dim learned projection reads the residual stream geometry more effectively than a linear probe on 24,576 sparse features.
+The raw residual stream outperforms the SAE decomposition by 12%, despite the SAE basis having 32x more features. The interpretable feature basis is not well aligned with the token-loss residual target. A 768-dim learned projection reads the residual stream geometry more effectively than a linear probe on 24,576 sparse features.
 
 ### 7c: rank overlap
 
@@ -319,7 +319,7 @@ Three diagnostics tracked per model, each with a specific failure mode:
 
 **Seed agreement stays high.** 0.88-0.95 across all sizes at the peak (two-thirds depth) layer. Phase 5a reported +0.99 on GPT-2 124M at layer 11 (the last layer); Phase 8 reports +0.918 on the same model at layer 8 (the peak layer). The difference reflects the layer, not a regression: last-layer representations are closer to the output distribution, which is more constrained, so probes trained there agree more tightly. At the peak layer, agreement is slightly lower but still high, indicating a near-canonical linear readout rather than a fragmented subspace.
 
-**Peak layer is consistently at roughly two-thirds depth.** The peak partial correlation occurs at layers 8/12, 16/24, 24/36, and 34/48. The observer signal is fully formed well before the model commits to a prediction, and this relative position is stable across model sizes.
+**Peak layer is consistently at roughly two-thirds depth within the GPT-2 family.** The peak partial correlation occurs at layers 8/12, 16/24, 24/36, and 34/48. The probe's peak signal occurs well before the model commits to a prediction, and this relative position is stable across GPT-2 model sizes. Llama 3.2 1B peaks earlier (38% depth), so the two-thirds pattern may be family-specific.
 
 **Note on GPT-2 Medium peak selection.** The global partial correlation peak for Medium lands at layer 23 of 24 (96% depth), essentially the output layer. At that position, the output-control test becomes degenerate (comparing a layer's signal against itself). The table reports layer 16 (67% depth), which is the highest-signal layer with clean separation from the output representation. The partial correlation at layer 16 is +0.279 (3 seeds, versus +0.286 from the single-seed coarse sweep). Layer 16 is consistent with the two-thirds-depth pattern observed in all other models.
 
@@ -329,13 +329,58 @@ Run: `just phase8`
 
 ### Methodology hardening
 
-Three supplementary experiments tighten the GPT-2 124M results without changing the research narrative. These are infrastructure improvements, not a numbered phase.
+**20-seed statistical hardening** (`just hardening`). 20 independent observer heads at layer 11 (seeds 42-61): partial corr +0.282 +/- 0.001, 95% CI [+0.282, +0.283]. Seed agreement +0.993. The 3-seed CIs were not misleadingly tight; 20 seeds confirms the same number.
 
-**20-seed statistical hardening** (`just hardening`). Trains 20 independent observer heads at layer 11 (seeds 42-61) and reports bootstrap 95% confidence intervals. The 3-seed CIs from Phases 5-7 are tight but underpowered for formal inference.
+**Control sensitivity** (`just control-sensitivity`). Partial correlation tested under six control specifications on GPT-2 124M:
 
-**Control sensitivity** (`just control-sensitivity`). Tests partial correlation stability across six control specifications: no controls (raw Spearman), softmax only, norm only, the standard pair, standard plus logit entropy, and a nonlinear MLP predictor trained on the same two covariates. If the nonlinear control absorbs the signal, the linear residualization was hiding a confound.
+| Control | Partial corr | What it tells you |
+|---|---|---|
+| none (raw Spearman) | +0.549 | Total correlation with loss |
+| norm only | +0.532 | Norm explains almost nothing |
+| softmax only | +0.283 | Softmax is the main confound |
+| standard (softmax + norm) | +0.282 | Norm adds nothing beyond softmax |
+| nonlinear MLP | +0.289 | Signal survives nonlinear deconfounding |
+| standard + logit entropy | +0.196 | Entropy absorbs ~30% of remaining signal |
 
-**Cross-domain transfer** (`just cross-domain`). Trains the observer on WikiText-103, evaluates on OpenWebText (web text) and CodeSearchNet (Python functions). If partial correlation transfers, the signal is a general property of the residual stream, not a Wikipedia-specific artifact.
+The nonlinear MLP control (trained on [max_softmax, activation_norm] to predict loss) produces a *higher* partial correlation than the linear control. The signal is not an artifact of linear residualization failing to remove a nonlinear confidence function. Adding logit entropy as a third control absorbs ~30%, indicating the observer partially reads the shape of the output distribution, not just the peak.
+
+**Cross-domain transfer** (`just cross-domain`). Implemented but not yet run. Would train the observer on WikiText-103 and evaluate on OpenWebText and CodeSearchNet.
+
+### Signal characterization
+
+What is the observer reading? Three representation-derived proxies and one token-level property were tested as additional controls (`just --mechanism-probes`, `just --signal-decomposition`).
+
+**Composition of the raw signal:**
+
+| Component | Absorbed | Cumulative | Source |
+|---|---|---|---|
+| Confidence (max softmax) | ~48% | 48% | Output distribution peak |
+| Distributional shape (logit entropy) | ~16% | 64% | Output distribution shape |
+| Geometric typicality (Mahalanobis) | ~7% | 71% | Distance from mean activation manifold |
+| Token frequency | ~6% | 77% | Vocabulary rarity |
+| Trajectory instability | 0% | 77% | Perturbation sensitivity (eliminated) |
+| Computation difficulty | 0% | 77% | Layer update magnitude (eliminated) |
+| **Unexplained** | **~23%** | **100%** | |
+
+About three quarters of the raw signal can be attributed to four named components. The remaining quarter resists all tested output-derived and representation-derived controls.
+
+**Where the signal lives geometrically.** The observer direction is nearly orthogonal to the dominant variance of the activation space. The first principal component (87% of variance) has cosine similarity 0.002 with the observer weight vector. The top 10 PCs capture 3.7% of the observer direction; the top 200 capture 45%. The signal reads from the low-variance subspace, the minor dimensions that the representation barely uses for its primary computation.
+
+**Where the output-independent component forms.** Tracking the output-controlled partial correlation at each layer:
+
+| Layer | Standard control | Output-controlled |
+|---|---|---|
+| 0 | +0.194 | +0.065 |
+| 2 | +0.216 | +0.075 |
+| 4 | +0.232 | +0.085 |
+| 6 | +0.270 | +0.107 |
+| 8 (peak) | +0.294 | +0.111 |
+| 10 | +0.293 | +0.111 |
+| 11 (output) | +0.284 | +0.077 |
+
+The output-independent component builds monotonically from layer 0 to layer 8, plateaus through layer 10, then drops at layer 11. The signal is constructed during mid-layer computation and partially collapsed into the output distribution at the final layer.
+
+**Where the signal is strongest operationally.** The observer discriminates quality across the full confidence spectrum, with the strongest discrimination (+0.461 Spearman with loss) in the high-confidence, low-loss quadrant. The observer is not primarily a "confident error" detector. It reads fine-grained quality gradations even among tokens the model handles well.
 
 ## Phase 9: Cross-family replication (complete)
 
@@ -360,7 +405,7 @@ The peak at layer 6 of 16 (38% depth) is earlier than the two-thirds pattern obs
 
 **Qwen 2.5 1.5B replicates the full finding.** Partial correlation (+0.284) is in the GPT-2 band (+0.279 to +0.290). The output-controlled residual (+0.207) is the highest measured in the project, exceeding GPT-2 XL (+0.174). Seed agreement is +0.982. The peak layer falls at 68% depth, consistent with the two-thirds-depth pattern observed across the GPT-2 family. All hand-designed baselines collapse to near zero (ff_goodness -0.000, active_ratio +0.017, act_entropy -0.027, activation_norm +0.001). The random head baseline is -0.035. The full failure-then-recovery pattern replicates.
 
-**Qwen 2.5 0.5B shows weaker signal.** Partial correlation is +0.134 with a positive but small output-controlled residual (+0.055). The layer profile does not form a clean mid-depth peak; the signal is present but does not concentrate at two-thirds depth in this 24-layer model. This is consistent with the pattern from Phase 8: signal strength and geometric stability increase with model capacity.
+**Qwen 2.5 0.5B shows weaker signal.** Partial correlation is +0.134 with a positive but small output-controlled residual (+0.055). The reported peak is layer 0, but the layer profile is essentially flat: layers 0, 21, and 22 all produce partial correlations between +0.134 and +0.136. The signal exists but does not concentrate at any particular depth in this 24-layer model, and the layer-0 "peak" should be interpreted as noise within a flat profile rather than a meaningful architectural feature. Signal strength and geometric stability both increase with model capacity across the project.
 
 ### Cross-family summary
 
@@ -380,9 +425,9 @@ Run: `just phase9a` (Llama), `just phase9b` (Qwen), `just phase9` (both)
 
 Across three independent architecture families (GPT-2, Qwen, Llama), the residual stream contains a stable decision-quality signal with a positive output-independent component in every case tested. This result has two complementary readings depending on the objective.
 
-**For observability,** this is a strong positive result. The signal persists across model sizes and architecture families, stays linearly accessible, and becomes more cleanly separable from output-derived information at larger scale. A learned linear projection recovers partial correlation of +0.250 to +0.290 across GPT-2, Qwen, and Llama, and the component that survives after controlling for a strong output-side predictor increases from +0.099 to +0.207 across the models tested. The residual-stream decision-quality signal appears stable across the models tested and becomes more distinguishable from output-derived information under this control setting.
+**For observability,** this is a strong positive result. The signal persists across model sizes and architecture families, stays linearly accessible, and becomes more cleanly separable from output-derived information at larger scale within the GPT-2 family. A learned linear projection recovers partial correlation of +0.250 to +0.290 across GPT-2, Qwen, and Llama. Within GPT-2, the component that survives a strong output-side control increases from +0.099 at 124M to +0.174 at 1.5B. All three families show positive output-controlled residuals.
 
-**For deployment and safety,** the same result implies that output-based monitoring captures a shrinking fraction of the model's internally encoded decision-quality signal as models scale. Confidence-only oversight is not just incomplete (Phase 6 already showed that); it becomes progressively more incomplete. At Qwen 1.5B, 73% of the observer's signal is not captured by the output-side predictor, compared to 34% at GPT-2 124M. This pattern holds across three architecture families (Phase 9).
+**For deployment and safety,** the same result implies that output-based monitoring captures a shrinking fraction of the model's internally encoded decision-quality signal across the GPT-2 scaling curve. Within GPT-2, the output-independent fraction increases from 34% at 124M to 60% at 1.5B. All three architecture families show positive output-controlled residuals (+0.126 to +0.207), confirming that the gap between internal state and output information is not family-specific.
 
 **For evaluation methodology,** published activation-monitoring results that report total correlation without controlling for output confidence are not measuring what they claim. The gap between raw Spearman (-0.725 in Phase 2a) and partial correlation (-0.056) is the difference between "this probe tracks loss" and "this probe tells you something confidence doesn't." Any system claiming to read internal state should report the independent component, not the total.
 
@@ -394,7 +439,7 @@ Across three independent architecture families (GPT-2, Qwen, Llama), the residua
 - No circuit discovery or feature visualization. Statistical proxies only.
 - Hyperparameters not swept (FF lr=0.03, BP lr=0.001, auxiliary weight=0.1 based on convention).
 - Causal evidence on transformers is partial. Directional ablation (Phase 5f) shows weak but bidirectional functional relevance; the observer direction is not a dominant causal axis of output formation.
-- Methodology hardening experiments (20-seed CIs, control sensitivity, cross-domain transfer) are implemented but not yet run.
+- Cross-domain transfer is implemented but not yet run. All results use WikiText-103.
 
 ## Open questions
 
@@ -477,6 +522,13 @@ Results go to `results/`. Phase 1 charts are generated by `analyze.ipynb`. Phase
 | [Limits of AI Explainability (2025)](https://arxiv.org/abs/2504.20676)                | Proves global interpretability is impossible; local explanations can be simpler |
 | [Infomorphic Networks (PNAS, 2025)](https://www.pnas.org/doi/10.1073/pnas.2408125122) | Local learning rules produce inherently interpretable representations           |
 | [Inference-Time Intervention (2023)](https://arxiv.org/abs/2306.03341)                | Precedent for inference-time activation monitoring and steering                 |
+| [CCS: Discovering Latent Knowledge (Burns et al., 2023)](https://arxiv.org/abs/2212.03827) | Unsupervised discovery of linear directions in activation space for truthfulness |
+| [LEACE (Belrose et al., 2023)](https://arxiv.org/abs/2306.03819)                     | Optimal linear erasure of concepts from representations; methodological ancestor |
+| [A Single Direction of Truth (2025)](https://arxiv.org/abs/2507.23221)               | Linear residual probe finds transferable hallucination direction; causal steering across Gemma 2B-27B |
+| [Reasoning Models Know When They're Right (2025)](https://arxiv.org/abs/2504.05419)  | Hidden states encode answer correctness; probes enable self-verification and early exit |
+| [ICR Probe (ACL 2025)](https://arxiv.org/abs/2507.16488)                             | Cross-layer hidden state dynamics for hallucination detection |
+| [PING: Alignment-Resistant Probing (2025)](https://www.medrxiv.org/content/10.1101/2025.09.17.25336018v2) | Probes on frozen transformers recover information outputs and safety tuning suppress |
+| [Tuned Lens (Belrose et al., 2023)](https://arxiv.org/abs/2303.08112) | Learned affine transformation decodes intermediate layers into vocabulary space |
 
 ## License
 

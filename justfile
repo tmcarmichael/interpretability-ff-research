@@ -127,7 +127,7 @@ smoke device=default_device:
 test:
     uv run pytest tests/ -v
 
-# Reproduce published results (Phases 1-8)
+# Reproduce published results (Phases 1-9)
 reproduce device=default_device:
     just train mnist 3 50 {{device}}
     just cifar10 3 50 {{device}}
@@ -141,6 +141,7 @@ reproduce device=default_device:
     just transformer-all 3 {{device}}
     just sae-compare 3 {{device}}
     just phase8 3 {{device}}
+    just phase9 3 {{device}}
 
 # Lint source files
 lint:

@@ -1255,6 +1255,1095 @@ def run_8b(model, tokenizer, device, seeds, train_docs, test_docs, max_tokens_tr
     return results
 
 
+def run_mechanism_probes(
+    model, tokenizer, device, seeds, train_docs, test_docs, max_tokens_train, max_tokens_test
+):
+    """Mechanism probes: what is the observer reading?
+
+    Compute three representation-derived proxies and test whether they
+    absorb the observer signal when added as partial correlation controls.
+
+    1. Representational coherence: Mahalanobis distance from layer mean
+    2. Trajectory instability: sensitivity of loss to activation perturbation
+    3. Computation difficulty: magnitude of residual stream update at this layer
+    """
+    layer = 8
+    print(f"\n{'=' * 60}")
+    print(f"  Mechanism probes at layer {layer}")
+    print(f"{'=' * 60}")
+
+    # Collect activations at layer 8 (train + test) and layer 7 (test only, for update magnitude)
+    print("  Collecting layer 8 train activations...")
+    train_8 = collect_layer_data(model, tokenizer, train_docs, layer, device, max_tokens_train)
+    print("  Collecting layer 8 test activations...")
+    test_8 = collect_layer_data(model, tokenizer, test_docs, layer, device, max_tokens_test)
+    print("  Collecting layer 7 test activations...")
+    test_7 = collect_layer_data(model, tokenizer, test_docs, layer - 1, device, max_tokens_test)
+
+    n_test = len(test_8["losses"])
+
+    # --- Proxy 1: Representational coherence (Mahalanobis distance) ---
+    print("\n  Computing representational coherence...")
+    acts_train = train_8["activations"].numpy()
+    acts_test = test_8["activations"].numpy()
+
+    mean_act = acts_train.mean(axis=0)
+    centered = acts_train - mean_act
+    # Regularized covariance for numerical stability
+    cov = np.cov(centered, rowvar=False) + 1e-4 * np.eye(centered.shape[1])
+    cov_inv = np.linalg.inv(cov)
+
+    test_centered = acts_test - mean_act
+    # Mahalanobis: sqrt((x - mu)^T Sigma^-1 (x - mu))
+    # Compute efficiently: (X @ L) where L L^T = Sigma^-1
+    L = np.linalg.cholesky(cov_inv)
+    projected = test_centered @ L
+    mahalanobis = np.sqrt((projected**2).sum(axis=1))
+    print(f"    Mahalanobis: mean={mahalanobis.mean():.2f}, std={mahalanobis.std():.2f}")
+
+    # --- Proxy 2: Trajectory instability (perturbation sensitivity) ---
+    print("  Computing trajectory instability...")
+    noise_std = 0.1
+    rng = np.random.default_rng(42)
+
+    # Approximate: perturb layer-8 activations, measure change in observer score
+    head = train_linear_binary(train_8, seed=42)
+    head.eval()
+    with torch.inference_mode():
+        base_scores = head(test_8["activations"]).squeeze(-1).numpy()
+
+    perturbation_deltas = []
+    n_samples = 5
+    for _ in range(n_samples):
+        noise = torch.from_numpy(
+            rng.normal(0, noise_std, size=(n_test, test_8["activations"].shape[1])).astype(np.float32)
+        )
+        perturbed = test_8["activations"] + noise
+        with torch.inference_mode():
+            perturbed_scores = head(perturbed).squeeze(-1).numpy()
+        perturbation_deltas.append(np.abs(perturbed_scores - base_scores))
+
+    instability = np.mean(perturbation_deltas, axis=0)
+    print(f"    Instability: mean={instability.mean():.4f}, std={instability.std():.4f}")
+
+    # --- Proxy 3: Computation difficulty (update magnitude) ---
+    print("  Computing computation difficulty...")
+    acts_7 = test_7["activations"][:n_test].numpy()
+    acts_8 = test_8["activations"][:n_test].numpy()
+
+    # Residual stream update: layer_8 - layer_7
+    update = acts_8 - acts_7
+    update_magnitude = np.sqrt((update**2).sum(axis=1))
+
+    # Also cosine similarity between consecutive layers
+    norm_7 = np.sqrt((acts_7**2).sum(axis=1, keepdims=True)) + 1e-8
+    norm_8 = np.sqrt((acts_8**2).sum(axis=1, keepdims=True)) + 1e-8
+    cosine_sim = (acts_7 * acts_8).sum(axis=1) / (norm_7.squeeze() * norm_8.squeeze())
+    print(f"    Update magnitude: mean={update_magnitude.mean():.2f}, std={update_magnitude.std():.2f}")
+    print(f"    Cosine(L7, L8): mean={cosine_sim.mean():.4f}, std={cosine_sim.std():.4f}")
+
+    # --- Partial correlation analysis ---
+    print(f"\n  Partial correlation analysis ({len(seeds)} seeds):")
+    standard_controls = [test_8["max_softmax"], test_8["activation_norm"]]
+
+    proxy_sets = {
+        "standard": standard_controls,
+        "+ mahalanobis": standard_controls + [mahalanobis],
+        "+ instability": standard_controls + [instability],
+        "+ update_magnitude": standard_controls + [update_magnitude],
+        "+ cosine_sim": standard_controls + [cosine_sim],
+        "+ all_proxies": standard_controls + [mahalanobis, update_magnitude, cosine_sim],
+    }
+
+    results = {"layer": layer, "n_seeds": len(seeds), "proxies": {}}
+
+    for seed in seeds:
+        print(f"\n  --- Seed {seed} ---")
+        obs_head = train_linear_binary(train_8, seed=seed)
+        obs_head.eval()
+        with torch.inference_mode():
+            obs_scores = obs_head(test_8["activations"]).squeeze(-1).numpy()
+
+        for name, controls in proxy_sets.items():
+            rho, p = partial_spearman(obs_scores, test_8["losses"], controls)
+            results["proxies"].setdefault(name, {"per_seed": []})
+            results["proxies"][name]["per_seed"].append(float(rho))
+            print(f"    {name:<22} rho = {rho:+.4f}")
+
+    # Summary
+    print("\n  MECHANISM PROBE RESULTS:")
+    print(f"  {'Control':<24} {'Mean':>8} {'Delta vs std':>14}")
+    print(f"  {'-' * 48}")
+    std_mean = float(np.mean(results["proxies"]["standard"]["per_seed"]))
+    for name in proxy_sets:
+        vals = results["proxies"][name]["per_seed"]
+        mean = float(np.mean(vals))
+        ci = bootstrap_ci(vals) if len(vals) >= 3 else (mean, mean)
+        results["proxies"][name]["mean"] = mean
+        results["proxies"][name]["ci_95"] = list(ci)
+        delta = mean - std_mean
+        absorbed = f"absorbs {abs(delta) / std_mean * 100:.0f}%" if delta < -0.005 else "no effect"
+        print(f"  {name:<24} {mean:>+8.4f} {delta:>+10.4f}  ({absorbed})")
+
+    # Raw correlations of proxies with loss
+    print("\n  Raw proxy correlations with loss:")
+    from scipy.stats import spearmanr as _sp
+
+    for pname, pvals in [
+        ("mahalanobis", mahalanobis),
+        ("update_magnitude", update_magnitude),
+        ("cosine_sim", cosine_sim),
+    ]:
+        r, p = _sp(pvals, test_8["losses"][: len(pvals)])
+        print(f"    {pname:<22} Spearman = {r:+.4f}")
+
+    return results
+
+
+def run_signal_decomposition(
+    model, tokenizer, device, seeds, train_docs, test_docs, max_tokens_train, max_tokens_test
+):
+    """Signal decomposition: break the observer signal into named components.
+
+    Extends the mechanism probes with:
+    1. Token frequency as control (is the observer reading word rarity?)
+    2. Confident-error analysis (where is the signal concentrated?)
+    3. Cross-layer residual tracking (where does output-independent signal form?)
+    4. Observer weight PCA alignment (what directions is it reading?)
+    """
+    layer = 8
+    print(f"\n{'=' * 60}")
+    print(f"  Signal decomposition at layer {layer}")
+    print(f"{'=' * 60}")
+
+    print("  Collecting train activations...")
+    train_data = collect_layer_data(model, tokenizer, train_docs, layer, device, max_tokens_train)
+    print("  Collecting test activations...")
+    test_data = collect_layer_data(model, tokenizer, test_docs, layer, device, max_tokens_test)
+
+    n_test = len(test_data["losses"])
+
+    # Train observer
+    head = train_linear_binary(train_data, seed=42)
+    head.eval()
+    with torch.inference_mode():
+        obs_scores = head(test_data["activations"]).squeeze(-1).numpy()
+
+    # --- 1. Token frequency control ---
+    print("\n  1. Token frequency analysis")
+
+    # Compute token frequencies from training documents
+    from collections import Counter
+
+    token_counts = Counter()
+    for doc in train_docs:
+        tokens = tokenizer(doc, truncation=True, max_length=512)["input_ids"]
+        token_counts.update(tokens)
+    total_tokens = sum(token_counts.values())
+
+    # Get test token IDs and their log-frequencies
+    test_token_ids = []
+    for doc in test_docs:
+        tokens = tokenizer(doc, truncation=True, max_length=512)["input_ids"]
+        if len(tokens) >= 2:
+            test_token_ids.extend(tokens[1:])  # shift by 1 to match loss positions
+    test_token_ids = test_token_ids[:n_test]
+    log_freq = np.array([np.log(token_counts.get(tid, 1) / total_tokens + 1e-10) for tid in test_token_ids])
+
+    from scipy.stats import spearmanr as _sp
+
+    freq_loss_corr, _ = _sp(log_freq, test_data["losses"])
+    print(f"    log_freq vs loss Spearman: {freq_loss_corr:+.4f}")
+
+    standard_controls = [test_data["max_softmax"], test_data["activation_norm"]]
+    rho_standard, _ = partial_spearman(obs_scores, test_data["losses"], standard_controls)
+    rho_freq, _ = partial_spearman(obs_scores, test_data["losses"], standard_controls + [log_freq])
+    print(f"    standard control:    {rho_standard:+.4f}")
+    print(f"    + token frequency:   {rho_freq:+.4f}")
+    freq_absorbed = (rho_standard - rho_freq) / rho_standard * 100
+    print(f"    frequency absorbs:   {freq_absorbed:.1f}%")
+
+    # --- 2. Confident-error decomposition ---
+    print("\n  2. Confident-error analysis")
+
+    losses = test_data["losses"]
+    softmax = test_data["max_softmax"]
+    median_loss = np.median(losses)
+    median_conf = np.median(softmax)
+
+    quadrants = {
+        "high_conf_low_loss": (softmax >= median_conf) & (losses <= median_loss),
+        "high_conf_high_loss": (softmax >= median_conf) & (losses > median_loss),
+        "low_conf_low_loss": (softmax < median_conf) & (losses <= median_loss),
+        "low_conf_high_loss": (softmax < median_conf) & (losses > median_loss),
+    }
+
+    print(f"    {'Quadrant':<25} {'N':>6} {'Obs corr w/ loss':>18} {'Mean obs score':>16}")
+    print(f"    {'-' * 67}")
+    quadrant_results = {}
+    for qname, mask in quadrants.items():
+        n_q = mask.sum()
+        if n_q > 100:
+            r, _ = _sp(obs_scores[mask], losses[mask])
+            mean_score = obs_scores[mask].mean()
+        else:
+            r, mean_score = 0.0, 0.0
+        quadrant_results[qname] = {"n": int(n_q), "spearman": float(r), "mean_score": float(mean_score)}
+        print(f"    {qname:<25} {n_q:>6} {r:>+18.4f} {mean_score:>16.4f}")
+
+    # --- 3. Cross-layer residual tracking ---
+    print("\n  3. Cross-layer output-independent signal")
+
+    # Train output-side predictor from last layer
+    print("    Collecting layer 11 data for output control...")
+    train_11 = collect_layer_data(model, tokenizer, train_docs, 11, device, max_tokens_train)
+    test_11 = collect_layer_data(model, tokenizer, test_docs, 11, device, max_tokens_test)
+
+    torch.manual_seed(42)
+    np.random.seed(42)
+    n_feat = train_11["activations"].size(1)
+    predictor = torch.nn.Sequential(torch.nn.Linear(n_feat, 64), torch.nn.ReLU(), torch.nn.Linear(64, 1))
+    opt = torch.optim.Adam(predictor.parameters(), lr=1e-3, weight_decay=1e-4)
+    ds = torch.utils.data.TensorDataset(train_11["activations"], torch.from_numpy(train_11["losses"]).float())
+    dl = torch.utils.data.DataLoader(ds, batch_size=1024, shuffle=True)
+    for _ep in range(20):
+        for bx, by in dl:
+            loss = F.mse_loss(predictor(bx).squeeze(-1), by)
+            opt.zero_grad(set_to_none=True)
+            loss.backward()
+            opt.step()
+    predictor.eval()
+    with torch.inference_mode():
+        pred_11_scores = predictor(test_11["activations"]).squeeze(-1).numpy()
+
+    layer_residuals = {}
+    for probe_layer in [0, 2, 4, 6, 8, 10, 11]:
+        layer_train = collect_layer_data(model, tokenizer, train_docs, probe_layer, device, max_tokens_train)
+        layer_test = collect_layer_data(model, tokenizer, test_docs, probe_layer, device, max_tokens_test)
+        layer_head = train_linear_binary(layer_train, seed=42)
+        layer_head.eval()
+        with torch.inference_mode():
+            layer_scores = layer_head(layer_test["activations"]).squeeze(-1).numpy()
+
+        rho_std, _ = partial_spearman(layer_scores, layer_test["losses"], standard_controls)
+        rho_ctrl, _ = partial_spearman(
+            layer_scores,
+            layer_test["losses"],
+            [layer_test["max_softmax"], layer_test["activation_norm"], pred_11_scores],
+        )
+        layer_residuals[probe_layer] = {"standard": float(rho_std), "output_controlled": float(rho_ctrl)}
+        print(f"    layer {probe_layer:>2}: standard={rho_std:+.4f}  output-controlled={rho_ctrl:+.4f}")
+
+    # --- 4. Observer weight PCA alignment ---
+    print("\n  4. Observer weight PCA alignment")
+
+    acts_test = test_data["activations"].numpy()
+    # PCA on test activations
+    mean_a = acts_test.mean(axis=0)
+    centered = acts_test - mean_a
+    cov_matrix = np.cov(centered, rowvar=False)
+    eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+    # Sort descending
+    idx = np.argsort(-eigenvalues)
+    eigenvalues = eigenvalues[idx]
+    eigenvectors = eigenvectors[:, idx]
+
+    # Observer weight direction
+    w = head.weight.data.cpu().squeeze().numpy()
+    w_unit = w / np.linalg.norm(w)
+
+    # Project observer direction onto PCs
+    projections = np.abs(eigenvectors.T @ w_unit)
+    print("    Top-10 PC alignment (|cos| with observer direction):")
+    for i in range(10):
+        print(
+            f"      PC{i:>3} (var {eigenvalues[i] / eigenvalues.sum() * 100:>5.1f}%): |cos| = {projections[i]:.4f}"
+        )
+
+    # How much of the observer direction lives in the top-k PCs?
+    for k in [10, 50, 100, 200]:
+        frac = (projections[:k] ** 2).sum()
+        print(f"    Top-{k} PCs capture {frac * 100:.1f}% of observer direction")
+
+    # --- Summary ---
+    print("\n  SIGNAL DECOMPOSITION SUMMARY")
+    print(f"  {'Component':<30} {'Absorbed':>10} {'Source':>20}")
+    print(f"  {'-' * 62}")
+    print(f"  {'Confidence (max softmax)':<30} {'~48%':>10} {'control sensitivity':>20}")
+    print(f"  {'Distributional shape (entropy)':<30} {'~16%':>10} {'control sensitivity':>20}")
+    print(f"  {'Geometric typicality (Mahal.)':<30} {'~7%':>10} {'mechanism probes':>20}")
+    print(f"  {'Token frequency':<30} {f'~{freq_absorbed:.0f}%':>10} {'this experiment':>20}")
+    total_explained = 48 + 16 + 7 + max(0, freq_absorbed)
+    print(f"  {'Unexplained':<30} {f'~{100 - total_explained:.0f}%':>10}")
+
+    return {
+        "layer": layer,
+        "token_frequency": {
+            "standard": float(rho_standard),
+            "with_frequency": float(rho_freq),
+            "absorbed_pct": float(freq_absorbed),
+            "freq_loss_corr": float(freq_loss_corr),
+        },
+        "quadrants": quadrant_results,
+        "cross_layer_residuals": {str(k): v for k, v in layer_residuals.items()},
+        "pca_alignment": {
+            "top_10_projections": [float(p) for p in projections[:10]],
+            "top_10_capture": float((projections[:10] ** 2).sum()),
+            "top_50_capture": float((projections[:50] ** 2).sum()),
+            "top_100_capture": float((projections[:100] ** 2).sum()),
+        },
+    }
+
+
+def _run_matched_component_sweep(model, observer, pairs, peak_layer):
+    """Sweep layers 0-peak, amplifying each component at low-score positions."""
+    print(f"\n  Component-level matched patching (layers 0-{peak_layer}):")
+    print(f"  {'Layer':<8} {'Comp':<6} {'Obs delta':>11} {'Loss delta':>12} {'Interpretation':>20}")
+    print(f"  {'-' * 59}")
+
+    component_results = {}
+    for layer in range(peak_layer + 1):
+        layer_results = {}
+        for comp in ["attn", "mlp"]:
+            obs_deltas, loss_deltas = _patch_one_component(
+                model, observer, pairs[:50], peak_layer, layer, comp
+            )
+
+            mean_obs = float(np.mean(obs_deltas)) if obs_deltas else 0.0
+            mean_loss = float(np.mean(loss_deltas)) if loss_deltas else 0.0
+
+            if mean_obs > 0.005 and mean_loss < -0.005:
+                interp = "CAUSAL +"
+            elif mean_obs > 0.005:
+                interp = "obs only"
+            elif mean_loss < -0.005:
+                interp = "loss only"
+            else:
+                interp = "no effect"
+
+            layer_results[comp] = {"obs_delta": mean_obs, "loss_delta": mean_loss, "interp": interp}
+            print(f"  {layer:<8} {comp:<6} {mean_obs:>+11.4f} {mean_loss:>+12.4f} {interp:>20}")
+        component_results[layer] = layer_results
+    return component_results
+
+
+def _patch_one_component(model, observer, pairs, peak_layer, layer, comp):
+    """Amplify one component at low-score positions, measure observer and loss deltas."""
+    obs_deltas = []
+    loss_deltas = []
+
+    for pair in pairs:
+        input_ids = pair["input_ids"]
+        low_pos = pair["low_positions"]
+        block = model.transformer.h[layer]
+        target = block.attn if comp == "attn" else block.mlp
+
+        # Baseline
+        with torch.inference_mode():
+            base_out = model(input_ids, output_hidden_states=True)
+        base_h = base_out.hidden_states[peak_layer + 1][0, :-1, :].cpu().float()
+        base_obs = observer(base_h).squeeze(-1).detach().numpy()
+        base_loss = (
+            F.cross_entropy(base_out.logits[0, :-1, :], input_ids[0, 1:], reduction="none").cpu().numpy()
+        )
+
+        # Capture clean component output
+        clean_out = [None]
+
+        def capture(module, inp, out, _c=clean_out):
+            _c[0] = (out[0] if isinstance(out, tuple) else out).detach().clone()
+            return out
+
+        h1 = target.register_forward_hook(capture)
+        with torch.inference_mode():
+            model(input_ids, output_hidden_states=True)
+        h1.remove()
+
+        # Amplify at low-score positions
+        def amplify(module, inp, out, _cl=clean_out[0], _pos=low_pos):
+            mod = (out[0] if isinstance(out, tuple) else out).clone()
+            for p in _pos:
+                if p < mod.size(1):
+                    mod[0, p, :] += 0.5 * _cl[0, p, :]
+            return (mod,) + out[1:] if isinstance(out, tuple) else mod
+
+        h2 = target.register_forward_hook(amplify)
+        with torch.inference_mode():
+            patch_out = model(input_ids, output_hidden_states=True)
+        h2.remove()
+
+        patch_h = patch_out.hidden_states[peak_layer + 1][0, :-1, :].cpu().float()
+        patch_obs = observer(patch_h).squeeze(-1).detach().numpy()
+        patch_loss = (
+            F.cross_entropy(patch_out.logits[0, :-1, :], input_ids[0, 1:], reduction="none").cpu().numpy()
+        )
+
+        valid = low_pos[low_pos < len(base_obs)]
+        if len(valid) > 0:
+            obs_deltas.append(float((patch_obs[valid] - base_obs[valid]).mean()))
+            loss_deltas.append(float((patch_loss[valid] - base_loss[valid]).mean()))
+
+    return obs_deltas, loss_deltas
+
+
+def run_matched_pair_patching(
+    model, tokenizer, device, train_docs, test_docs, max_tokens_train, max_tokens_test
+):
+    """Matched-pair activation patching: causal localization of the observer signal.
+
+    Finds token positions where the observer scores differ substantially
+    (high-score vs low-score positions within the same documents), then
+    patches component outputs from high-score contexts into low-score
+    contexts. Measures both observer score change and loss change.
+
+    If patching a component causes the observer score to increase AND
+    loss to decrease in the recipient context, that component causally
+    carries decision-quality information.
+    """
+    peak_layer = 8
+
+    print(f"\n{'=' * 60}")
+    print(f"  Matched-pair activation patching (layers 0-{peak_layer})")
+    print(f"{'=' * 60}")
+
+    # Train observer
+    print("  Training observer head...")
+    train_data = collect_layer_data(model, tokenizer, train_docs, peak_layer, device, max_tokens_train)
+    observer = train_linear_binary(train_data, seed=42)
+    observer.eval()
+
+    # Collect document-level data: for each document, get per-position observer scores and losses
+    print("  Collecting paired data from test documents...")
+    eval_docs = test_docs[:200]
+    doc_data = []
+
+    model.eval()
+    for doc in eval_docs:
+        if not doc.strip():
+            continue
+        tokens = tokenizer(doc, return_tensors="pt", truncation=True, max_length=512)
+        input_ids = tokens["input_ids"].to(device)
+        if input_ids.size(1) < 4:
+            continue
+
+        with torch.inference_mode():
+            outputs = model(input_ids, output_hidden_states=True)
+
+        h = outputs.hidden_states[peak_layer + 1][0, :-1, :].cpu().float()
+        scores = observer(h).squeeze(-1).detach().numpy()
+        losses = F.cross_entropy(outputs.logits[0, :-1, :], input_ids[0, 1:], reduction="none").cpu().numpy()
+
+        doc_data.append({"input_ids": input_ids, "scores": scores, "losses": losses, "n_pos": len(scores)})
+
+    # Build matched pairs: high-score and low-score positions from same document
+    # Use documents with enough positions and score variance
+    pairs = []
+    for dd in doc_data:
+        if dd["n_pos"] < 10:
+            continue
+        scores = dd["scores"]
+        p20 = np.percentile(scores, 20)
+        p80 = np.percentile(scores, 80)
+        low_idx = np.where(scores <= p20)[0]
+        high_idx = np.where(scores >= p80)[0]
+        if len(low_idx) >= 2 and len(high_idx) >= 2:
+            pairs.append(
+                {
+                    "input_ids": dd["input_ids"],
+                    "low_positions": low_idx,
+                    "high_positions": high_idx,
+                    "low_mean_score": float(scores[low_idx].mean()),
+                    "high_mean_score": float(scores[high_idx].mean()),
+                    "low_mean_loss": float(dd["losses"][low_idx].mean()),
+                    "high_mean_loss": float(dd["losses"][high_idx].mean()),
+                }
+            )
+
+    print(f"    {len(pairs)} documents with valid high/low pairs")
+    if not pairs:
+        print("    No valid pairs found")
+        return {"error": "no valid pairs"}
+
+    # For each component, patch high-score component outputs into the full forward pass
+    component_results = _run_matched_component_sweep(model, observer, pairs, peak_layer)
+
+    # Summary
+    print("\n  CAUSAL COMPONENTS (obs increase + loss decrease):")
+    causal_found = False
+    for layer, comps in sorted(component_results.items()):
+        for comp, vals in comps.items():
+            if vals["interp"] == "CAUSAL +":
+                print(
+                    f"    layer {layer} {comp}: obs={vals['obs_delta']:+.4f} loss={vals['loss_delta']:+.4f}"
+                )
+                causal_found = True
+    if not causal_found:
+        print("    None found with dual-metric criteria")
+
+    return {
+        "peak_layer": peak_layer,
+        "n_pairs": len(pairs),
+        "component_results": {str(k): v for k, v in component_results.items()},
+    }
+
+
+def run_activation_patching(
+    model, tokenizer, device, train_docs, test_docs, max_tokens_train, max_tokens_test
+):
+    """Activation patching: which components causally produce the observer signal?
+
+    For each attention layer and MLP at layers 0 through peak_layer, zero
+    out the component's contribution to the residual stream and measure
+    the change in observer score. Components with the largest effect are
+    causally responsible for the signal.
+
+    Then do head-level patching at the top-contributing layers.
+    """
+    peak_layer = 8
+    n_heads = model.config.num_attention_heads
+    head_dim = model.config.hidden_size // n_heads
+
+    print(f"\n{'=' * 60}")
+    print(f"  Activation patching (layers 0-{peak_layer})")
+    print(f"{'=' * 60}")
+
+    # Train observer head
+    print("  Training observer head at layer 8...")
+    train_data = collect_layer_data(model, tokenizer, train_docs, peak_layer, device, max_tokens_train)
+    head = train_linear_binary(train_data, seed=42)
+    head.eval()
+
+    # Select a subset of test documents for patching (forward passes are expensive)
+    eval_docs = test_docs[:100]
+    eval_budget = 20000
+
+    # Baseline: observer scores without intervention
+    print("  Computing baseline observer scores...")
+    baseline_scores = _collect_observer_scores(
+        model, tokenizer, head, peak_layer, eval_docs, device, eval_budget
+    )
+    n_eval = len(baseline_scores)
+    print(f"    {n_eval} positions, mean score: {baseline_scores.mean():.4f}")
+
+    # --- Component-level patching (attention + MLP per layer) ---
+    print(f"\n  Component-level patching (layers 0-{peak_layer}):")
+    component_effects = {}
+
+    for layer in range(peak_layer + 1):
+        # Zero attention output at this layer
+        attn_scores = _patch_component(
+            model,
+            tokenizer,
+            head,
+            peak_layer,
+            eval_docs,
+            device,
+            eval_budget,
+            target_layer=layer,
+            component="attn",
+        )
+        attn_delta = float((attn_scores - baseline_scores).mean())
+
+        # Zero MLP output at this layer
+        mlp_scores = _patch_component(
+            model,
+            tokenizer,
+            head,
+            peak_layer,
+            eval_docs,
+            device,
+            eval_budget,
+            target_layer=layer,
+            component="mlp",
+        )
+        mlp_delta = float((mlp_scores - baseline_scores).mean())
+
+        component_effects[layer] = {"attn": attn_delta, "mlp": mlp_delta}
+        print(f"    layer {layer:>2}: attn={attn_delta:+.4f}  mlp={mlp_delta:+.4f}")
+
+    # Find top-contributing layers
+    attn_effects = [(l, e["attn"]) for l, e in component_effects.items()]
+    mlp_effects = [(l, e["mlp"]) for l, e in component_effects.items()]
+    top_attn_layer = max(attn_effects, key=lambda x: abs(x[1]))
+    top_mlp_layer = max(mlp_effects, key=lambda x: abs(x[1]))
+    print(f"\n    Top attention: layer {top_attn_layer[0]} ({top_attn_layer[1]:+.4f})")
+    print(f"    Top MLP: layer {top_mlp_layer[0]} ({top_mlp_layer[1]:+.4f})")
+
+    # --- Head-level patching at top attention layers ---
+    head_layers_to_probe = sorted(set([top_attn_layer[0], peak_layer]))
+    head_effects = {}
+
+    for layer in head_layers_to_probe:
+        print(f"\n  Head-level patching at layer {layer} ({n_heads} heads):")
+        layer_head_effects = {}
+        for h_idx in range(n_heads):
+            patched_scores = _patch_head(
+                model,
+                tokenizer,
+                head,
+                peak_layer,
+                eval_docs,
+                device,
+                eval_budget,
+                target_layer=layer,
+                head_idx=h_idx,
+                n_heads=n_heads,
+                head_dim=head_dim,
+            )
+            delta = float((patched_scores - baseline_scores).mean())
+            layer_head_effects[h_idx] = delta
+            print(f"    head {h_idx:>2}: {delta:+.4f}")
+
+        head_effects[layer] = layer_head_effects
+
+        # Top heads
+        sorted_heads = sorted(layer_head_effects.items(), key=lambda x: abs(x[1]), reverse=True)
+        print(f"    Top 3: {[(h, f'{d:+.4f}') for h, d in sorted_heads[:3]]}")
+
+    # Summary
+    print("\n  ACTIVATION PATCHING SUMMARY")
+    print(f"  {'Layer':<8} {'Attn effect':>12} {'MLP effect':>12} {'Total':>12}")
+    print(f"  {'-' * 46}")
+    for layer in range(peak_layer + 1):
+        a = component_effects[layer]["attn"]
+        m = component_effects[layer]["mlp"]
+        print(f"  {layer:<8} {a:>+12.4f} {m:>+12.4f} {a + m:>+12.4f}")
+
+    return {
+        "peak_layer": peak_layer,
+        "n_eval_positions": n_eval,
+        "component_effects": {str(k): v for k, v in component_effects.items()},
+        "head_effects": {str(k): {str(h): d for h, d in v.items()} for k, v in head_effects.items()},
+    }
+
+
+def _collect_observer_scores(model, tokenizer, head, peak_layer, docs, device, max_tokens):
+    """Collect observer scores from test documents."""
+    all_scores = []
+    total = 0
+    model.eval()
+    with torch.inference_mode():
+        for doc in docs:
+            if total >= max_tokens:
+                break
+            if not doc.strip():
+                continue
+            tokens = tokenizer(doc, return_tensors="pt", truncation=True, max_length=512)
+            input_ids = tokens["input_ids"].to(device)
+            if input_ids.size(1) < 2:
+                continue
+            outputs = model(input_ids, output_hidden_states=True)
+            h = outputs.hidden_states[peak_layer + 1][0, :-1, :].cpu().float()
+            scores = head(h).squeeze(-1).numpy()
+            all_scores.append(scores)
+            total += len(scores)
+    return np.concatenate(all_scores)[:max_tokens]
+
+
+def _patch_component(model, tokenizer, head, peak_layer, docs, device, max_tokens, target_layer, component):
+    """Zero out attention or MLP output at target_layer, collect observer scores at peak_layer."""
+
+    def make_hook(comp):
+        def hook_fn(module, input, output):
+            if comp == "attn":
+                # GPT-2 attention returns (attn_output, present, attn_weights) or (attn_output,)
+                if isinstance(output, tuple):
+                    zeroed = torch.zeros_like(output[0])
+                    return (zeroed,) + output[1:]
+                return torch.zeros_like(output)
+            else:  # mlp
+                return torch.zeros_like(output)
+
+        return hook_fn
+
+    block = model.transformer.h[target_layer]
+    if component == "attn":
+        handle = block.attn.register_forward_hook(make_hook("attn"))
+    else:
+        handle = block.mlp.register_forward_hook(make_hook("mlp"))
+
+    scores = _collect_observer_scores(model, tokenizer, head, peak_layer, docs, device, max_tokens)
+    handle.remove()
+    return scores
+
+
+def _patch_head(
+    model,
+    tokenizer,
+    observer_head,
+    peak_layer,
+    docs,
+    device,
+    max_tokens,
+    target_layer,
+    head_idx,
+    n_heads,
+    head_dim,
+):
+    """Zero a single attention head via c_proj pre-hook (zeroes its slice before projection)."""
+    block = model.transformer.h[target_layer]
+    start = head_idx * head_dim
+    end = start + head_dim
+
+    def hook_fn(module, inp):
+        x = inp[0].clone()
+        x[:, :, start:end] = 0.0
+        return (x,)
+
+    handle = block.attn.c_proj.register_forward_pre_hook(hook_fn)
+    scores = _collect_observer_scores(model, tokenizer, observer_head, peak_layer, docs, device, max_tokens)
+    handle.remove()
+    return scores
+
+
+def run_mechanistic_analysis(
+    model, tokenizer, device, train_docs, test_docs, max_tokens_train, max_tokens_test
+):
+    """Best-practice mechanistic analysis of the observer signal.
+
+    Three improvements over the initial patching:
+    1. Mean ablation (replace with dataset mean) instead of zero ablation
+    2. Residualized observer metric (partial out confidence before measuring delta)
+    3. Composition tests (patch layer groups, check additivity)
+
+    Uses the activation-patching best-practices recommendations:
+    - Mean ablation preserves activation statistics
+    - Multiple metrics (residualized observer score + raw loss)
+    - Aggregate over many positions, not single examples
+    """
+    peak_layer = 8
+    n_heads = model.config.num_attention_heads
+    head_dim = model.config.hidden_size // n_heads
+
+    print("\n" + "=" * 60)
+    print("  Mechanistic analysis (best-practice patching)")
+    print("=" * 60)
+
+    # Collect data and train observer
+    print("  Collecting train data at layer 8...")
+    train_data = collect_layer_data(model, tokenizer, train_docs, peak_layer, device, max_tokens_train)
+    observer = train_linear_binary(train_data, seed=42)
+    observer.eval()
+
+    # Compute mean component outputs across training data (for mean ablation)
+    print("  Computing mean component activations...")
+    eval_docs = test_docs[:150]
+    eval_budget = 30000
+    component_means = _compute_component_means(model, tokenizer, eval_docs, device, peak_layer, eval_budget)
+
+    # Baseline: collect per-position observer scores, losses, and confidence
+    print("  Computing baseline scores...")
+    baseline = _collect_full_baseline(model, tokenizer, observer, peak_layer, eval_docs, device, eval_budget)
+    n_eval = baseline["n"]
+    print(f"    {n_eval} positions")
+
+    # --- Part 1: Mean ablation per component ---
+    print("\n  Part 1: Mean ablation (layers 0-8)")
+    print(f"  {'Layer':<8} {'Comp':<6} {'Obs resid delta':>16} {'Loss delta':>12} {'Raw obs delta':>15}")
+    print(f"  {'-' * 59}")
+
+    ablation_results = {}
+    for layer in range(peak_layer + 1):
+        layer_r = {}
+        for comp in ["attn", "mlp"]:
+            patched = _mean_ablate_component(
+                model,
+                tokenizer,
+                observer,
+                peak_layer,
+                eval_docs,
+                device,
+                eval_budget,
+                layer,
+                comp,
+                component_means,
+            )
+            # Residualized observer delta: partial out confidence change
+            obs_resid_delta = _residualized_delta(
+                baseline["obs_scores"], patched["obs_scores"], baseline["max_softmax"], patched["max_softmax"]
+            )
+            loss_delta = float(patched["losses"].mean() - baseline["losses"].mean())
+            raw_obs_delta = float(patched["obs_scores"].mean() - baseline["obs_scores"].mean())
+
+            layer_r[comp] = {
+                "obs_resid_delta": obs_resid_delta,
+                "loss_delta": loss_delta,
+                "raw_obs_delta": raw_obs_delta,
+            }
+            print(
+                f"  {layer:<8} {comp:<6} {obs_resid_delta:>+16.4f} {loss_delta:>+12.4f} {raw_obs_delta:>+15.4f}"
+            )
+
+        ablation_results[layer] = layer_r
+
+    # --- Part 2: Composition tests ---
+    print("\n  Part 2: Composition tests")
+    groups = {
+        "attn_5_6": [(5, "attn"), (6, "attn")],
+        "attn_7_8": [(7, "attn"), (8, "attn")],
+        "attn_5_8": [(5, "attn"), (6, "attn"), (7, "attn"), (8, "attn")],
+        "mlp_3_4": [(3, "mlp"), (4, "mlp")],
+        "all_mid": [(5, "attn"), (6, "attn"), (7, "attn"), (8, "attn"), (3, "mlp"), (4, "mlp")],
+    }
+
+    composition_results = {}
+    for gname, components in groups.items():
+        patched = _mean_ablate_group(
+            model,
+            tokenizer,
+            observer,
+            peak_layer,
+            eval_docs,
+            device,
+            eval_budget,
+            components,
+            component_means,
+        )
+        obs_resid = _residualized_delta(
+            baseline["obs_scores"], patched["obs_scores"], baseline["max_softmax"], patched["max_softmax"]
+        )
+        loss_d = float(patched["losses"].mean() - baseline["losses"].mean())
+
+        # Expected from individual ablations (additivity check)
+        expected = sum(ablation_results[l][c]["obs_resid_delta"] for l, c in components)
+
+        composition_results[gname] = {
+            "obs_resid_delta": obs_resid,
+            "loss_delta": loss_d,
+            "expected_additive": expected,
+            "interaction": obs_resid - expected,
+        }
+        print(
+            f"    {gname:<14}: obs_resid={obs_resid:+.4f}  loss={loss_d:+.4f}  "
+            f"expected={expected:+.4f}  interaction={obs_resid - expected:+.4f}"
+        )
+
+    # --- Part 3: Head-level at top attention layers ---
+    top_attn = sorted(
+        [(l, ablation_results[l]["attn"]["obs_resid_delta"]) for l in range(peak_layer + 1)],
+        key=lambda x: abs(x[1]),
+        reverse=True,
+    )
+    probe_layers = sorted(set([top_attn[0][0], top_attn[1][0], peak_layer]))
+
+    head_results = {}
+    for layer in probe_layers:
+        print(f"\n  Part 3: Head-level mean ablation at layer {layer}")
+        block = model.transformer.h[layer]
+        layer_heads = {}
+
+        for h_idx in range(n_heads):
+            start = h_idx * head_dim
+            end = start + head_dim
+
+            # Compute mean for this head's slice
+            head_mean = component_means[(layer, "attn")][:, :, start:end].mean(dim=0, keepdim=True)
+
+            def make_hook(s, e, hm):
+                def hook_fn(module, inp):
+                    x = inp[0].clone()
+                    x[:, :, s:e] = hm.to(x.device)
+                    return (x,)
+
+                return hook_fn
+
+            handle = block.attn.c_proj.register_forward_pre_hook(make_hook(start, end, head_mean))
+            patched = _collect_full_baseline(
+                model, tokenizer, observer, peak_layer, eval_docs, device, eval_budget
+            )
+            handle.remove()
+
+            obs_resid = _residualized_delta(
+                baseline["obs_scores"], patched["obs_scores"], baseline["max_softmax"], patched["max_softmax"]
+            )
+            loss_d = float(patched["losses"].mean() - baseline["losses"].mean())
+            layer_heads[h_idx] = {"obs_resid_delta": obs_resid, "loss_delta": loss_d}
+
+        head_results[layer] = layer_heads
+        sorted_h = sorted(layer_heads.items(), key=lambda x: abs(x[1]["obs_resid_delta"]), reverse=True)
+        for h_idx, vals in sorted_h:
+            print(
+                f"    head {h_idx:>2}: obs_resid={vals['obs_resid_delta']:+.4f}  loss={vals['loss_delta']:+.4f}"
+            )
+        top3 = [(h, round(v["obs_resid_delta"], 4)) for h, v in sorted_h[:3]]
+        print(f"    Top 3: {top3}")
+
+    # --- Summary ---
+    print("\n  MECHANISTIC ANALYSIS SUMMARY")
+    print(f"  {'Layer':<8} {'Attn obs_resid':>15} {'MLP obs_resid':>15} {'Attn loss':>11} {'MLP loss':>11}")
+    print(f"  {'-' * 62}")
+    for layer in range(peak_layer + 1):
+        ar = ablation_results[layer]
+        print(
+            f"  {layer:<8} {ar['attn']['obs_resid_delta']:>+15.4f} {ar['mlp']['obs_resid_delta']:>+15.4f}"
+            f" {ar['attn']['loss_delta']:>+11.4f} {ar['mlp']['loss_delta']:>+11.4f}"
+        )
+
+    print("\n  Composition:")
+    for gname, vals in composition_results.items():
+        additive = (
+            "additive" if abs(vals["interaction"]) < 0.01 else f"interaction={vals['interaction']:+.4f}"
+        )
+        print(f"    {gname:<14}: {vals['obs_resid_delta']:+.4f} ({additive})")
+
+    return {
+        "peak_layer": peak_layer,
+        "n_eval": n_eval,
+        "ablation_results": {str(k): v for k, v in ablation_results.items()},
+        "composition_results": composition_results,
+        "head_results": {str(k): {str(h): v for h, v in heads.items()} for k, heads in head_results.items()},
+    }
+
+
+def _compute_component_means(model, tokenizer, docs, device, max_layer, max_tokens):
+    """Collect mean activation for each attention and MLP output at each layer."""
+    means = {}
+    accumulators = {}
+
+    def make_accumulator_hook(key):
+        def hook_fn(module, inp, out):
+            val = out[0] if isinstance(out, tuple) else out
+            if key not in accumulators:
+                accumulators[key] = []
+            accumulators[key].append(val.detach().cpu())
+            return out
+
+        return hook_fn
+
+    handles = []
+    for layer in range(max_layer + 1):
+        block = model.transformer.h[layer]
+        handles.append(block.attn.register_forward_hook(make_accumulator_hook((layer, "attn"))))
+        handles.append(block.mlp.register_forward_hook(make_accumulator_hook((layer, "mlp"))))
+
+    total = 0
+    model.eval()
+    with torch.inference_mode():
+        for doc in docs:
+            if total >= max_tokens:
+                break
+            if not doc.strip():
+                continue
+            tokens = tokenizer(doc, return_tensors="pt", truncation=True, max_length=512)
+            input_ids = tokens["input_ids"].to(device)
+            if input_ids.size(1) < 2:
+                continue
+            model(input_ids)
+            total += input_ids.size(1) - 1
+
+    for h in handles:
+        h.remove()
+
+    for key, tensors in accumulators.items():
+        cat = torch.cat(tensors, dim=1)
+        means[key] = cat.mean(dim=1, keepdim=True)  # [1, 1, hidden_dim]
+
+    return means
+
+
+def _collect_full_baseline(model, tokenizer, observer, peak_layer, docs, device, max_tokens):
+    """Collect observer scores, losses, and confidence for all positions."""
+    all_obs, all_loss, all_sm = [], [], []
+    total = 0
+    model.eval()
+    with torch.inference_mode():
+        for doc in docs:
+            if total >= max_tokens:
+                break
+            if not doc.strip():
+                continue
+            tokens = tokenizer(doc, return_tensors="pt", truncation=True, max_length=512)
+            input_ids = tokens["input_ids"].to(device)
+            if input_ids.size(1) < 2:
+                continue
+            outputs = model(input_ids, output_hidden_states=True)
+            h = outputs.hidden_states[peak_layer + 1][0, :-1, :].cpu().float()
+            scores = observer(h).squeeze(-1).detach().numpy()
+            losses = (
+                F.cross_entropy(outputs.logits[0, :-1, :], input_ids[0, 1:], reduction="none").cpu().numpy()
+            )
+            sm = F.softmax(outputs.logits[0, :-1, :], dim=-1).max(dim=-1).values.cpu().numpy()
+            all_obs.append(scores)
+            all_loss.append(losses)
+            all_sm.append(sm)
+            total += len(scores)
+
+    return {
+        "obs_scores": np.concatenate(all_obs)[:max_tokens],
+        "losses": np.concatenate(all_loss)[:max_tokens],
+        "max_softmax": np.concatenate(all_sm)[:max_tokens],
+        "n": min(total, max_tokens),
+    }
+
+
+def _mean_ablate_component(
+    model, tokenizer, observer, peak_layer, docs, device, max_tokens, target_layer, component, means
+):
+    """Replace a component's output with its dataset mean, collect scores."""
+    mean_val = means[(target_layer, component)]
+    block = model.transformer.h[target_layer]
+    target = block.attn if component == "attn" else block.mlp
+
+    def hook_fn(module, inp, out):
+        m = mean_val.to(out[0].device if isinstance(out, tuple) else out.device)
+        expanded = m.expand_as(out[0] if isinstance(out, tuple) else out)
+        if isinstance(out, tuple):
+            return (expanded,) + out[1:]
+        return expanded
+
+    handle = target.register_forward_hook(hook_fn)
+    result = _collect_full_baseline(model, tokenizer, observer, peak_layer, docs, device, max_tokens)
+    handle.remove()
+    return result
+
+
+def _mean_ablate_group(model, tokenizer, observer, peak_layer, docs, device, max_tokens, components, means):
+    """Mean-ablate multiple components simultaneously."""
+    handles = []
+    for layer, comp in components:
+        mean_val = means[(layer, comp)]
+        block = model.transformer.h[layer]
+        target = block.attn if comp == "attn" else block.mlp
+
+        def make_hook(mv):
+            def hook_fn(module, inp, out):
+                m = mv.to(out[0].device if isinstance(out, tuple) else out.device)
+                expanded = m.expand_as(out[0] if isinstance(out, tuple) else out)
+                if isinstance(out, tuple):
+                    return (expanded,) + out[1:]
+                return expanded
+
+            return hook_fn
+
+        handles.append(target.register_forward_hook(make_hook(mean_val)))
+
+    result = _collect_full_baseline(model, tokenizer, observer, peak_layer, docs, device, max_tokens)
+    for h in handles:
+        h.remove()
+    return result
+
+
+def _residualized_delta(base_obs, patched_obs, base_sm, patched_sm):
+    """Compute the change in observer score after partialling out confidence change.
+
+    If confidence shifts under patching, raw observer score change conflates
+    the observer-specific effect with the confidence-mediated effect.
+    This removes the confidence-mediated component.
+    """
+    # Estimate how much of the observer change is explained by confidence change
+    sm_delta = patched_sm - base_sm
+    obs_delta = patched_obs - base_obs
+
+    # Regress obs_delta on sm_delta to get the confidence-explained component
+    if np.std(sm_delta) > 1e-8:
+        beta = np.cov(obs_delta, sm_delta)[0, 1] / np.var(sm_delta)
+        residualized = obs_delta - beta * sm_delta
+    else:
+        residualized = obs_delta
+
+    return float(residualized.mean())
+
+
 def run_8c(model, tokenizer, device, seeds, train_docs, test_docs, max_tokens_train, max_tokens_test):
     """8c: Cross-domain transfer.
 
@@ -1971,6 +3060,27 @@ def main():
         "--statistical-hardening", action="store_true", help="20-seed hardening with bootstrap CIs"
     )
     P.add_argument("--control-sensitivity", action="store_true", help="Control sensitivity analysis")
+    P.add_argument(
+        "--mechanism-probes", action="store_true", help="Mechanism probes (what is the observer reading?)"
+    )
+    P.add_argument(
+        "--signal-decomposition", action="store_true", help="Signal decomposition (named components)"
+    )
+    P.add_argument(
+        "--activation-patching",
+        action="store_true",
+        help="Activation patching (zero-ablation causal scan)",
+    )
+    P.add_argument(
+        "--matched-patching",
+        action="store_true",
+        help="Matched-pair patching (dual-metric causal localization)",
+    )
+    P.add_argument(
+        "--mechanistic",
+        action="store_true",
+        help="Best-practice mechanistic analysis (mean ablation + composition)",
+    )
     P.add_argument("--cross-domain", action="store_true", help="Cross-domain transfer test")
     P.add_argument("--scale", "--phase8", action="store_true", help="Phase 8: scaling across GPT-2 family")
     P.add_argument("--model", default="gpt2", help="Model for single-model scaling run")
@@ -2035,7 +3145,16 @@ def main():
     print(f"  {sum(p.numel() for p in model.parameters()) / 1e6:.0f}M parameters")
 
     hardening_only = (
-        (a.statistical_hardening or a.control_sensitivity or a.cross_domain)
+        (
+            a.statistical_hardening
+            or a.control_sensitivity
+            or a.mechanism_probes
+            or a.signal_decomposition
+            or a.activation_patching
+            or a.matched_patching
+            or a.mechanistic
+            or a.cross_domain
+        )
         and not a.all
         and not a.layer_sweep
         and not a.baselines
@@ -2094,6 +3213,31 @@ def main():
     if a.control_sensitivity:
         results["control_sensitivity"] = run_8b(
             model, tokenizer, a.device, seeds, train_docs, test_docs, a.max_tokens_train, a.max_tokens_test
+        )
+
+    if a.mechanism_probes:
+        results["mechanism_probes"] = run_mechanism_probes(
+            model, tokenizer, a.device, seeds, train_docs, test_docs, a.max_tokens_train, a.max_tokens_test
+        )
+
+    if a.signal_decomposition:
+        results["signal_decomposition"] = run_signal_decomposition(
+            model, tokenizer, a.device, seeds, train_docs, test_docs, a.max_tokens_train, a.max_tokens_test
+        )
+
+    if a.activation_patching:
+        results["activation_patching"] = run_activation_patching(
+            model, tokenizer, a.device, train_docs, test_docs, a.max_tokens_train, a.max_tokens_test
+        )
+
+    if a.matched_patching:
+        results["matched_patching"] = run_matched_pair_patching(
+            model, tokenizer, a.device, train_docs, test_docs, a.max_tokens_train, a.max_tokens_test
+        )
+
+    if a.mechanistic:
+        results["mechanistic"] = run_mechanistic_analysis(
+            model, tokenizer, a.device, train_docs, test_docs, a.max_tokens_train, a.max_tokens_test
         )
 
     if a.cross_domain:
