@@ -48,6 +48,8 @@ The results split "observability" into two problems that behave differently.
 
 Per-example observability requires learning the right projection from activations, not computing hand-designed statistics. This holds across architectures and scales; the learned projections that work on MLPs transfer to GPT-2 124M through 1.5B with no loss in signal strength. No single monitoring channel is sufficient. Confidence, raw activation probes, and SAE-based probes each flag different subsets of errors (Phase 7). Production monitoring systems that rely on confidence alone, or on any one activation-derived signal, leave a measurable gap.
 
+Even systems with strong output-based evaluation (calibrated confidence, external classifiers, eval harnesses) operate on the end result of computation. The observer signal is available before the final mapping into the output distribution, which means failure detection can happen during inference rather than only after it. Output-based monitors are also limited to what the model's logits reveal. Phase 8 suggests that outputs expose a shrinking fraction of the model's internally encoded decision-quality signal as models grow. An internal monitoring channel that reads signal not fully captured by the output becomes more important at larger scale, not less.
+
 A downstream concern: unfaithful probes are evadable. Models can maintain identical input-output behavior while rearranging activations into subspaces that defeat monitors. An observer that reads signal independent of the output distribution should be harder to evade, because the model can't rearrange that signal without changing its internal computation. The output-controlled residual measures that independence: +0.099 at 124M, increasing to +0.174 at 1.5B (Phase 8).
 
 ### The faithfulness bar
@@ -56,7 +58,7 @@ Observability was evaluated against three tests.
 
 - **Correlation.** Does the observer signal track decision-relevant metrics beyond what cheap baselines capture? *Passed across scale.* Partial correlation +0.279 to +0.290 across GPT-2 124M to 1.5B, after controlling for confidence and activation norm (Phases 4-5, 8).
 - **Prediction.** Can the observer rank likely failures in a way that complements output confidence? *Passed on GPT-2 124M.* 4,368 exclusive high-loss catches at 10% flag rate (Phase 6). Three-channel monitoring catches substantially more errors than any single channel (Phase 7). Not yet tested at larger model sizes.
-- **Intervention.** Does observer-guided ablation degrade performance faster than random? *Passed on MLPs* (Phase 2 intervention). *Inconclusive on transformers* due to residual stream buffering (Phase 5d). Directional ablation (projecting out the learned direction from the residual stream) is a more targeted design, implemented but not yet run.
+- **Intervention.** Does observer-guided ablation degrade performance faster than random? *Passed on MLPs* (Phase 2 intervention). *Partial on transformers* (Phase 5f). Neuron ablation was inconclusive due to residual stream buffering (Phase 5d). Directional ablation shows weak but bidirectional causal evidence: removing the observer direction causes monotonic loss increase, and amplifying it preferentially helps observer-flagged tokens (3x targeting ratio). The observer direction is functionally relevant but not a dominant causal axis of output formation.
 
 ## Phase 1: structural comparison (complete)
 
@@ -203,7 +205,25 @@ Observer-guided ablation of MLP intermediate neurons at layer 8, compared agains
 | 30% | 4.98 | 5.01 | 4.99 |
 | 50% | 5.05 | 4.94 | 4.94 |
 
-No strategy produces meaningful loss increase. Layer 8's MLP is robust to ablation of up to 50% of its 3072 intermediate neurons regardless of which neurons are removed. The residual stream architecture buffers MLP damage through skip connections. The causal question remains open, not answered negatively.
+No strategy produces meaningful loss increase. Layer 8's MLP is robust to ablation of up to 50% of its 3072 intermediate neurons regardless of which neurons are removed. The residual stream architecture buffers MLP damage through skip connections.
+
+### Phase 5f: directional ablation (partial causal)
+
+Phase 5d failed because neuron ablation targets individual basis vectors, but the observer signal is distributed across 250+ neurons (Phase 4). Directional ablation intervenes on the residual stream directly, projecting out the learned observer direction: h' = h - alpha * (h . d) * d. Three baselines (random directions, confidence direction), dose-response sweep (0-100%), and bidirectional steering (removal and amplification).
+
+| Alpha | Observer | Random | Confidence | Obs flagged | Obs unflagged |
+|---|---|---|---|---|---|
+| 0% | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 |
+| 25% | +0.002 | +0.000 | +0.029 | +0.002 | +0.002 |
+| 50% | +0.004 | +0.001 | +0.134 | +0.004 | +0.005 |
+| 75% | +0.007 | +0.002 | +0.306 | +0.006 | +0.007 |
+| 100% | +0.010 | +0.004 | +0.549 | +0.007 | +0.010 |
+
+Removing the observer direction causes monotonic loss increase, roughly 2x the random baseline. The confidence direction is 57x more destructive, which is expected: confidence is directly output-relevant, while the observer reads something more diagnostic than decisive.
+
+The stronger evidence comes from amplification. Adding the observer direction back reduces loss, and the effect is 3x larger on observer-flagged tokens (-0.013) than unflagged tokens (-0.004). This is direction-specific, sign-specific, and target-specific, making it harder to dismiss as generic residual perturbation.
+
+Destructive removal does not selectively harm flagged tokens (ratio 0.63, unflagged degrade slightly more). The observer direction is functionally relevant but not a dominant causal axis. The signal it reads is diagnostic (predicts which tokens will have high loss) rather than decisive (directly determines the output).
 
 ### Phase 5e: full-output control (positive)
 
@@ -267,6 +287,10 @@ At 10% flag rate, combining raw observer, SAE probe, and output confidence:
 
 Each channel flags 10% of test tokens independently. The three-channel union has a larger effective flag budget (~25% of tokens after overlap), so the 1.8x catch improvement reflects both complementary coverage and expanded flagging volume. The comparison that controls for budget is the per-channel exclusive catches: the SAE probe catches 4,527 high-loss tokens that neither confidence nor the raw observer flags, and the raw observer catches 4,368 that neither of the others flags. The 30% rank divergence from 7c translates to operationally distinct error coverage.
 
+### 7b: three-channel causal decomposition
+
+Directional ablation applied to each channel's direction independently, measuring loss delta on each channel's exclusive token catches. The 3x3 matrix of (direction removed) x (token subset affected) tests whether the 7d correlational structure is causally real. Effect sizes are small and the expected diagonal dominance pattern (each direction disproportionately hurting its own exclusive catches) does not emerge clearly. The residual stream's redundancy absorbs single-direction removal without localized damage, consistent with the Phase 5f finding that the observer direction is functional but not output-dominant.
+
 ## Phase 8: Scale characterization (complete)
 
 Phases 5-7 established the finding on GPT-2 124M. Phase 8 tests whether the signal persists across model scale. The GPT-2 family (124M, 355M, 774M, 1.5B) provides a four-point scaling curve with no confounders: same architecture, tokenizer, and training distribution. Model size is the only variable.
@@ -329,7 +353,7 @@ Across the GPT-2 scaling curve, decision-quality signal remains stably encoded i
 - Tested on the GPT-2 family only (124M to 1.5B). Whether the signal persists across architecture families (Llama, Mistral) and at frontier scale (8B+) is unknown.
 - No circuit discovery or feature visualization. Statistical proxies only.
 - Hyperparameters not swept (FF lr=0.03, BP lr=0.001, auxiliary weight=0.1 based on convention).
-- Intervention on GPT-2 is inconclusive due to MLP robustness at layer 8. The causal link between observer-weighted neurons and model decisions is established on MLPs but not on transformers.
+- Causal evidence on transformers is partial. Directional ablation (Phase 5f) shows weak but bidirectional functional relevance; the observer direction is not a dominant causal axis of output formation.
 - Methodology hardening experiments (20-seed CIs, control sensitivity, cross-domain transfer) are implemented but not yet run.
 
 ## Open questions
@@ -337,7 +361,7 @@ Across the GPT-2 scaling curve, decision-quality signal remains stably encoded i
 Each of these is a separate project with different compute requirements and baselines.
 
 - **Scale beyond GPT-2.** Phase 8 covers GPT-2 124M through 1.5B within one architecture family. Whether the signal persists at Llama 8B or larger, across a different architecture family and training distribution, would determine whether this is a GPT-2 property or a transformer property.
-- **Causal validation.** Phase 5d (neuron ablation) was inconclusive because residual stream skip connections buffer MLP damage. Directional ablation (projecting out the learned direction from the residual stream) and three-channel causal decomposition (7b) are implemented and would test whether the signal is functional or epiphenomenal.
+- **Stronger causal evidence.** Phase 5f provides partial causal support (monotonic dose-response, amplification preferentially helps flagged tokens). Stronger designs (multi-direction projection, activation patching, path patching) could establish whether the observer direction is causally necessary for specific decisions, not just functionally correlated.
 - **Cross-domain transfer.** The cross-domain experiment tests WikiText-to-OpenWebText and WikiText-to-code transfer. Broader coverage (dialogue, reasoning, multilingual) would further characterize the signal's generality.
 - **Mechanism.** What is the learned direction actually encoding? Circuit-level analysis or feature visualization could connect the statistical finding to a mechanistic account.
 

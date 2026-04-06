@@ -103,6 +103,18 @@ cross-domain seeds=default_seeds device=default_device:
 phase8 seeds=default_seeds device=default_device:
     uv run --extra transformer src/transformer_observe.py --scale --seeds {{seeds}} --device {{device}}
 
+# Phase 9a: cross-family replication (Llama 3.2 1B)
+phase9a seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --phase9a --seeds {{seeds}} --device {{device}}
+
+# Phase 9b: second family replication (Qwen 2.5 0.5B + 1.5B)
+phase9b seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --phase9b --seeds {{seeds}} --device {{device}}
+
+# Phase 9: all cross-family experiments (9a + 9b)
+phase9 seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --phase9 --seeds {{seeds}} --device {{device}}
+
 # Run all experiments (alias for reproduce)
 all device=default_device:
     just reproduce {{device}}

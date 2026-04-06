@@ -507,7 +507,7 @@ def _compute_confidence_direction(model, tokenizer, docs, layer, device, max_pos
         captured = [None]
 
         def capture_hook(module, input, output, _c=captured):
-            h = output[0]
+            h = output[0] if isinstance(output, tuple) else output
             h.retain_grad()
             _c[0] = h
             return output
@@ -547,10 +547,12 @@ def _eval_direction_intervention(
     d = direction.to(device)
 
     def hook(module, input, output):
-        h = output[0]
-        proj = (h * d).sum(dim=-1, keepdim=True)
-        h_new = h - alpha * proj * d
-        return (h_new,) + output[1:]
+        if isinstance(output, tuple):
+            h = output[0]
+            proj = (h * d).sum(dim=-1, keepdim=True)
+            return (h - alpha * proj * d,) + output[1:]
+        proj = (output * d).sum(dim=-1, keepdim=True)
+        return output - alpha * proj * d
 
     handle = model.transformer.h[layer].register_forward_hook(hook)
     all_losses = []
@@ -1671,6 +1673,271 @@ def run_scale(device, seeds, train_docs, test_docs, max_tokens_train, max_tokens
 
 
 # ---------------------------------------------------------------------------
+# Phase 9: Cross-family replication
+# ---------------------------------------------------------------------------
+
+CROSS_FAMILY_MODELS = {
+    "9a": [("meta-llama/Llama-3.2-1B", 1236)],
+    "9b": [("Qwen/Qwen2.5-0.5B", 495), ("Qwen/Qwen2.5-1.5B", 1544)],
+}
+
+
+def run_cross_family(
+    phase, device, seeds, train_docs, test_docs, max_tokens_train, max_tokens_test, model_id_override=None
+):
+    """Phase 9: Cross-family replication of the observer signal.
+
+    Same evaluation protocol as Phase 8 (layer sweep, three-seed battery,
+    output-controlled residual), plus negative baselines (hand-designed
+    observers, random head). Uses AutoModel for architecture-agnostic loading.
+
+    Saves to cross_family.json with deep merge (safe for partial reruns).
+
+    9a: Llama 3.2 1B (headline cross-family test)
+    9b: Qwen 2.5 0.5B + 1.5B (second family replication)
+    """
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    if model_id_override:
+        models_to_run = [(model_id_override, 0)]
+    else:
+        models_to_run = CROSS_FAMILY_MODELS.get(phase, [])
+
+    if not models_to_run:
+        print(f"  No models configured for phase {phase}")
+        return {}
+
+    print(f"\n{'=' * 60}")
+    print(f"  Phase {phase}: Cross-family replication")
+    print(f"  Models: {[m[0] for m in models_to_run]}")
+    print(f"  Seeds: {seeds}")
+    print(f"{'=' * 60}")
+
+    all_results = {}
+
+    for model_id, n_params_m in models_to_run:
+        print(f"\n{'=' * 60}")
+        print(f"  Model: {model_id}")
+        print(f"{'=' * 60}")
+
+        print(f"  Loading {model_id}...")
+        tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id, trust_remote_code=True, torch_dtype=torch.float32
+        ).to(device)
+        model.eval()
+
+        n_layers = model.config.num_hidden_layers
+        hidden_dim = model.config.hidden_size
+        n_params_m = n_params_m or int(sum(p.numel() for p in model.parameters()) / 1e6)
+        output_layer = n_layers - 1
+        print(f"  {n_params_m}M params, {n_layers} layers, hidden dim {hidden_dim}")
+
+        # Scale token budget inversely with hidden dim
+        scale_factor = 768 / hidden_dim
+        adj_train = int(max_tokens_train * scale_factor)
+        adj_test = int(max_tokens_test * scale_factor)
+        print(f"  Token budget: {adj_train} train, {adj_test} test (scaled {scale_factor:.2f}x)")
+
+        # Ensure tokenizer has a pad token (some models lack one)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+        # --- Step 1: Layer sweep ---
+        print("\n  Step 1: Layer sweep")
+        peak_layer, layer_profile = _coarse_layer_sweep(
+            model, tokenizer, device, train_docs, test_docs, n_layers, adj_train, adj_test
+        )
+
+        # Guard against peak at output layer (same fix as Phase 8 medium)
+        if peak_layer >= output_layer - 1:
+            max_mid = int(0.8 * n_layers)
+            mid_candidates = {l: r for l, r in layer_profile.items() if l <= max_mid}
+            if mid_candidates:
+                mid_peak = max(mid_candidates, key=mid_candidates.get)
+                print(
+                    f"  Global peak at layer {peak_layer} ({peak_layer / n_layers:.0%} depth) is near output."
+                )
+                print(
+                    f"  Using mid-depth peak at layer {mid_peak} ({mid_peak / n_layers:.0%} depth) for output control."
+                )
+                peak_layer = mid_peak
+        print(f"  Peak layer: {peak_layer} (partial corr {layer_profile[peak_layer]:+.4f})")
+
+        # --- Step 2: Full battery at peak layer ---
+        print(f"\n  Step 2: Full battery at layer {peak_layer} ({len(seeds)} seeds)")
+        train_peak = collect_layer_data(model, tokenizer, train_docs, peak_layer, device, adj_train)
+        test_peak = collect_layer_data(model, tokenizer, test_docs, peak_layer, device, adj_test)
+
+        all_scores = []
+        all_rhos = []
+        for seed in seeds:
+            head = train_linear_binary(train_peak, seed=seed)
+            scores, rho, p = evaluate_head(head, test_peak)
+            all_scores.append(scores)
+            all_rhos.append(float(rho))
+            print(f"    seed {seed}: partial corr = {rho:+.4f}")
+
+        pairwise = []
+        for i in range(len(seeds)):
+            for j in range(i + 1, len(seeds)):
+                r, _ = spearmanr(all_scores[i], all_scores[j])
+                pairwise.append(float(r))
+
+        mean_rho = float(np.mean(all_rhos))
+        rho_ci = bootstrap_ci(all_rhos) if len(all_rhos) >= 3 else (mean_rho, mean_rho)
+        mean_agree = float(np.mean(pairwise)) if pairwise else 0.0
+        agree_ci = bootstrap_ci(pairwise) if len(pairwise) >= 3 else (mean_agree, mean_agree)
+
+        # --- Step 3: Negative baselines at peak layer ---
+        print(f"\n  Step 3: Negative baselines at layer {peak_layer}")
+        hand_designed = compute_hand_designed(test_peak)
+        baseline_results = {}
+        for name, scores in hand_designed.items():
+            rho_hd, p_hd = partial_spearman(
+                scores, test_peak["losses"], [test_peak["max_softmax"], test_peak["activation_norm"]]
+            )
+            baseline_results[name] = float(rho_hd)
+            print(f"    {name:<20} partial corr = {rho_hd:+.4f}")
+
+        # Random head baseline
+        torch.manual_seed(99)
+        random_head = torch.nn.Linear(hidden_dim, 1)
+        random_head.eval()
+        with torch.inference_mode():
+            random_scores = random_head(test_peak["activations"]).squeeze(-1).numpy()
+        rho_rand, _ = partial_spearman(
+            random_scores, test_peak["losses"], [test_peak["max_softmax"], test_peak["activation_norm"]]
+        )
+        baseline_results["random_head"] = float(rho_rand)
+        print(f"    {'random_head':<20} partial corr = {rho_rand:+.4f}")
+
+        # --- Step 4: Output-controlled residual ---
+        print(f"\n  Step 4: Output control (layer {peak_layer} vs layer {output_layer})")
+        train_last = collect_layer_data(model, tokenizer, train_docs, output_layer, device, adj_train)
+        test_last = collect_layer_data(model, tokenizer, test_docs, output_layer, device, adj_test)
+
+        all_rhos_controlled = []
+        for seed in seeds:
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+
+            acts_last = train_last["activations"]
+            targets = torch.from_numpy(train_last["losses"]).float()
+            n_feat = acts_last.size(1)
+            predictor = torch.nn.Sequential(
+                torch.nn.Linear(n_feat, 64), torch.nn.ReLU(), torch.nn.Linear(64, 1)
+            )
+            opt = torch.optim.Adam(predictor.parameters(), lr=1e-3, weight_decay=1e-4)
+            ds = torch.utils.data.TensorDataset(acts_last, targets)
+            dl = torch.utils.data.DataLoader(ds, batch_size=1024, shuffle=True)
+            for _ep in range(20):
+                for bx, by in dl:
+                    loss = F.mse_loss(predictor(bx).squeeze(-1), by)
+                    opt.zero_grad(set_to_none=True)
+                    loss.backward()
+                    opt.step()
+
+            predictor.eval()
+            with torch.inference_mode():
+                pred_scores = predictor(test_last["activations"]).squeeze(-1).numpy()
+
+            head = train_linear_binary(train_peak, seed=seed)
+            head.eval()
+            with torch.inference_mode():
+                obs_scores = head(test_peak["activations"]).squeeze(-1).numpy()
+
+            rho_ctrl, _ = partial_spearman(
+                obs_scores,
+                test_peak["losses"],
+                [test_peak["max_softmax"], test_peak["activation_norm"], pred_scores],
+            )
+            all_rhos_controlled.append(float(rho_ctrl))
+            print(f"    seed {seed}: output-controlled = {rho_ctrl:+.4f}")
+
+        mean_ctrl = float(np.mean(all_rhos_controlled))
+        ctrl_ci = (
+            bootstrap_ci(all_rhos_controlled) if len(all_rhos_controlled) >= 3 else (mean_ctrl, mean_ctrl)
+        )
+
+        # --- Summary ---
+        print(f"\n  {model_id} SUMMARY:")
+        print(f"    peak layer:       {peak_layer} ({peak_layer / n_layers:.0%} depth)")
+        print(f"    partial corr:     {mean_rho:+.4f}  95% CI [{rho_ci[0]:+.4f}, {rho_ci[1]:+.4f}]")
+        print(f"    seed agreement:   {mean_agree:+.4f}  95% CI [{agree_ci[0]:+.4f}, {agree_ci[1]:+.4f}]")
+        print(f"    output-controlled:{mean_ctrl:+.4f}  95% CI [{ctrl_ci[0]:+.4f}, {ctrl_ci[1]:+.4f}]")
+        print(f"    baselines: {baseline_results}")
+
+        # Compare to GPT-2 band
+        gpt2_band = (0.279, 0.290)
+        if mean_rho >= gpt2_band[0] * 0.7:
+            if mean_rho >= gpt2_band[0]:
+                print("    --> In GPT-2 band: strong cross-family replication")
+            else:
+                print("    --> Below GPT-2 band but nontrivial: weaker cross-family signal")
+        else:
+            print("    --> Well below GPT-2 band: signal may be family-dependent")
+
+        model_key = model_id.split("/")[-1]
+        all_results[model_key] = {
+            "model_id": model_id,
+            "n_layers": n_layers,
+            "hidden_dim": hidden_dim,
+            "n_params_m": n_params_m,
+            "peak_layer": peak_layer,
+            "peak_layer_frac": round(peak_layer / n_layers, 2),
+            "layer_profile": {str(k): v for k, v in sorted(layer_profile.items())},
+            "partial_corr": {
+                "mean": mean_rho,
+                "std": float(np.std(all_rhos)),
+                "per_seed": all_rhos,
+                "ci_95": list(rho_ci),
+            },
+            "seed_agreement": {
+                "mean": mean_agree,
+                "pairwise": pairwise,
+                "ci_95": list(agree_ci),
+            },
+            "output_controlled": {
+                "mean": mean_ctrl,
+                "std": float(np.std(all_rhos_controlled)),
+                "per_seed": all_rhos_controlled,
+                "ci_95": list(ctrl_ci),
+            },
+            "baselines": baseline_results,
+            "n_train_tokens": adj_train,
+            "n_test_tokens": adj_test,
+        }
+
+        # Free memory
+        del model, train_peak, test_peak, train_last, test_last
+        import gc
+
+        gc.collect()
+        if device == "cuda":
+            torch.cuda.empty_cache()
+
+    # Summary table
+    print(f"\n{'=' * 60}")
+    print(f"  Phase {phase}: CROSS-FAMILY SUMMARY")
+    print(f"{'=' * 60}")
+    print(
+        f"  {'Model':<20} {'Params':>7} {'Peak':>6} {'Partial corr':>14}"
+        f" {'Output ctrl':>13} {'Seed agree':>12}"
+    )
+    print(f"  {'-' * 74}")
+    for key, r in all_results.items():
+        pc = r["partial_corr"]["mean"]
+        oc = r["output_controlled"]["mean"]
+        sa = r["seed_agreement"]["mean"]
+        print(
+            f"  {key:<20} {r['n_params_m']:>6}M  L{r['peak_layer']:<4} {pc:>+14.4f} {oc:>+13.4f} {sa:>+12.4f}"
+        )
+
+    return {"models": all_results}
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1695,6 +1962,9 @@ def main():
     P.add_argument("--cross-domain", action="store_true", help="Cross-domain transfer test")
     P.add_argument("--scale", "--phase8", action="store_true", help="Phase 8: scaling across GPT-2 family")
     P.add_argument("--model", default="gpt2", help="Model for single-model scaling run")
+    P.add_argument("--phase9a", action="store_true", help="Phase 9a: Llama 3.2 1B cross-family test")
+    P.add_argument("--phase9b", action="store_true", help="Phase 9b: Qwen 2.5 0.5B + 1.5B replication")
+    P.add_argument("--phase9", action="store_true", help="Phase 9: all cross-family experiments (9a + 9b)")
     a = P.parse_args()
 
     if a.device == "auto":
@@ -1726,6 +1996,21 @@ def main():
         elapsed = time.time() - t0
         print(f"\nTotal time: {elapsed:.0f}s")
         _save_results(results)
+        return
+
+    # Phase 9: cross-family replication (handles its own model loading)
+    if a.phase9a or a.phase9 or a.phase9b:
+        if a.phase9a or a.phase9:
+            results["9a"] = run_cross_family(
+                "9a", a.device, seeds, train_docs, test_docs, a.max_tokens_train, a.max_tokens_test
+            )
+        if a.phase9b or a.phase9:
+            results["9b"] = run_cross_family(
+                "9b", a.device, seeds, train_docs, test_docs, a.max_tokens_train, a.max_tokens_test
+            )
+        elapsed = time.time() - t0
+        print(f"\nTotal time: {elapsed:.0f}s")
+        _save_results(results, filename="cross_family.json")
         return
 
     # Phases 5-8: load GPT-2 124M
