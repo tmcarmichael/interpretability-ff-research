@@ -27,7 +27,7 @@ This project builds to that conclusion through nine phases, each motivated by th
 | **Phase 6** | Does the signal catch errors confidence misses? | **Yes** | At 10% flag rate, the layer 8 observer catches 4,368 high-loss tokens (5.2% of test set) that output confidence does not flag. |
 | **Phase 7** | How does this compare to SAE-based probes? | **Raw observer wins** | A 768-dim linear observer outperforms a 24,576-feature SAE probe (+0.290 vs +0.255 partial corr). Combining all three channels catches substantially more errors than any single channel. |
 | **Phase 8** | Does the signal persist across model scale? | **Yes** | Partial corr +0.279 to +0.290 across GPT-2 124M to 1.5B. Output-independent component increases from +0.099 to +0.174 across this scaling curve. Seed agreement 0.88-0.95. Peak at roughly two-thirds depth throughout. |
-| **Phase 9** | Does the signal replicate outside GPT-2? | **Yes** | Qwen 2.5 1.5B: partial corr +0.284, output-controlled +0.207, seed agreement +0.982, peak at 68% depth. Hand-designed baselines collapse. Full failure-then-recovery pattern replicates. Gemma 2 2B in progress. |
+| **Phase 9** | Does the signal replicate outside GPT-2? | **Yes** | Qwen 2.5 1.5B: partial corr +0.284, output-controlled +0.207, seed agreement +0.982, peak at 68% depth. Hand-designed baselines collapse. Full failure-then-recovery pattern replicates. Llama 3.2 1B in progress. |
 
 **Key findings:**
 
@@ -361,11 +361,11 @@ Phase 8 established the signal across the GPT-2 family. Phase 9 tests whether it
 
 At matched parameter count, a different architecture family trained on different data with a different tokenizer produces nearly identical signal strength, higher output independence, and the same relative peak depth. The learned observer signal is not a GPT-2 artifact.
 
-### 9a: Gemma 2 2B (in progress)
+### 9a: Llama 3.2 1B (in progress)
 
-Google Gemma 2 2B provides a third architecture family (Google, distinct from both OpenAI-lineage GPT-2 and Alibaba Qwen). Results will be added when the run completes.
+Meta Llama 3.2 1B provides a third architecture family (Meta, full attention, distinct from both GPT-2 and Qwen). Results will be added when the run completes.
 
-Run: `just phase9a` (Gemma), `just phase9b` (Qwen), `just phase9` (both)
+Run: `just phase9a` (Llama), `just phase9b` (Qwen), `just phase9` (both)
 
 ## What this means
 
@@ -381,7 +381,7 @@ Across GPT-2 and Qwen scaling curves, decision-quality signal remains stably enc
 
 ## Limitations
 
-- Tested on GPT-2 (124M to 1.5B), Qwen 2.5 (0.5B, 1.5B), and Gemma 2 (2B, pending). All base models. Whether the signal persists at frontier scale (8B+) or in instruction-tuned models is unknown.
+- Tested on GPT-2 (124M to 1.5B) and Qwen 2.5 (0.5B, 1.5B). Llama 3.2 1B in progress. All base models. Whether the signal persists at frontier scale (8B+) or in instruction-tuned models is unknown.
 - No circuit discovery or feature visualization. Statistical proxies only.
 - Hyperparameters not swept (FF lr=0.03, BP lr=0.001, auxiliary weight=0.1 based on convention).
 - Causal evidence on transformers is partial. Directional ablation (Phase 5f) shows weak but bidirectional functional relevance; the observer direction is not a dominant causal axis of output formation.
@@ -431,7 +431,7 @@ just transformer-all        # All transformer experiments (5a-6a)
 just sae-compare            # Phase 7: SAE comparison (7a + 7c + 7d)
 just causal                 # 7b: three-channel causal decomposition
 just phase8                 # Phase 8: GPT-2 scaling curve (124M → 1.5B)
-just phase9a                # Phase 9a: Gemma 2 2B cross-family test
+just phase9a                # Phase 9a: Llama 3.2 1B cross-family test
 just phase9b                # Phase 9b: Qwen 2.5 0.5B + 1.5B replication
 just phase9                 # Phase 9: all cross-family experiments
 just hardening              # 20-seed statistical hardening

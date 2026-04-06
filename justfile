@@ -103,7 +103,7 @@ cross-domain seeds=default_seeds device=default_device:
 phase8 seeds=default_seeds device=default_device:
     uv run --extra transformer src/transformer_observe.py --scale --seeds {{seeds}} --device {{device}}
 
-# Phase 9a: cross-family replication (Gemma 2 2B)
+# Phase 9a: cross-family replication (Llama 3.2 1B)
 phase9a seeds=default_seeds device=default_device:
     uv run --extra transformer src/transformer_observe.py --phase9a --seeds {{seeds}} --device {{device}}
 
