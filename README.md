@@ -37,6 +37,8 @@ Mid-layer activations retain decision-quality information that standard output c
 
 What distinguishes this from related work is the partial correlation evaluation. Kramár et al. report total correlation for production probes. CCS (Burns et al.) uses unsupervised contrastive methods where confidence control is not directly applicable. "A Single Direction of Truth" probes for hallucination, a different target. The comparison is methodological, not a claim that all related work is confidence-confounded.
 
+These results suggest that internal decision-quality signal is not merely present but differentially preserved by training and model-family choices. If that pattern holds under stronger causal isolation, observability may be a design variable: future LLMs could be trained not only for capability, but for preservation of linearly accessible internal quality signals that support monitoring during inference.
+
 ### The faithfulness bar
 
 Observability was evaluated against three tests.
