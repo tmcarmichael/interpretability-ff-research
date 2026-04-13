@@ -8,7 +8,7 @@ We measure whether transformer activations contain error signals beyond output c
 <img src="assets/cross_family_scaling.png" width="85%" alt="Cross-family scaling: Mistral, GPT-2, and Qwen maintain stable observability signal across scale. Llama drops sharply above 1B.">
 </p>
 
-*Confidence-independent decision quality signal across five architecture families. Same evaluation protocol, same data, same controls. Qwen, GPT-2, and Mistral maintain a stable signal. Llama drops sharply above 1B. The difference is architectural. Open markers are preliminary (3 seeds).*
+_Confidence-independent decision quality signal across five architecture families. Same evaluation protocol, same data, same controls. Qwen, GPT-2, and Mistral maintain a stable signal. Llama drops sharply above 1B. The difference is architectural. Open markers are preliminary (3 seeds)._
 
 ## Why this matters
 
@@ -35,19 +35,19 @@ WikiText-trained probes transfer to C4 on all four non-Gemma families tested. Tr
 
 ## Cross-family results
 
-| Model | Family | Params | rho_partial | +/- std | r_OC | tau_seed | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Qwen 2.5 0.5B | Qwen | 0.5B | +0.215 | 0.020 | +0.059 | +0.959 | |
-| Gemma 3 1B | Gemma | 1B | +0.388 | 0.004 | +0.307 | +0.980 | Random head +0.213 |
-| Llama 3.2 1B | Llama | 1.2B | +0.250 | --- | +0.126 | +0.999 | Preliminary (3 seeds) |
-| Qwen 2.5 1.5B | Qwen | 1.5B | +0.275 | 0.032 | +0.127 | +0.953 | |
-| GPT-2 XL | GPT-2 | 1.5B | +0.290 | 0.004 | +0.174 | +0.952 | |
-| Qwen 2.5 3B | Qwen | 3B | +0.263 | 0.021 | +0.144 | +0.925 | |
-| Llama 3.2 3B | Llama | 3B | +0.089 | 0.003 | +0.033 | +0.999 | |
-| Qwen 2.5 7B | Qwen | 7B | +0.255 | 0.019 | +0.137 | +0.964 | |
-| Mistral 7B | Mistral | 7.2B | +0.313 | 0.001 | +0.156 | +0.995 | |
-| Llama 3.1 8B | Llama | 8B | +0.088 | --- | +0.054 | --- | Preliminary (3 seeds) |
-| Qwen 2.5 14B | Qwen | 14B | +0.214 | 0.032 | +0.096 | +0.851 | |
+| Model         | Family  | Params | rho_partial | +/- std | r_OC   | tau_seed | Notes                 |
+| ------------- | ------- | ------ | ----------- | ------- | ------ | -------- | --------------------- |
+| Qwen 2.5 0.5B | Qwen    | 0.5B   | +0.215      | 0.020   | +0.059 | +0.959   |                       |
+| Gemma 3 1B    | Gemma   | 1B     | +0.388      | 0.004   | +0.307 | +0.980   | Random head +0.213    |
+| Llama 3.2 1B  | Llama   | 1.2B   | +0.250      | ---     | +0.126 | +0.999   | Preliminary (3 seeds) |
+| Qwen 2.5 1.5B | Qwen    | 1.5B   | +0.275      | 0.032   | +0.127 | +0.953   |                       |
+| GPT-2 XL      | GPT-2   | 1.5B   | +0.290      | 0.004   | +0.174 | +0.952   |                       |
+| Qwen 2.5 3B   | Qwen    | 3B     | +0.263      | 0.021   | +0.144 | +0.925   |                       |
+| Llama 3.2 3B  | Llama   | 3B     | +0.089      | 0.003   | +0.033 | +0.999   |                       |
+| Qwen 2.5 7B   | Qwen    | 7B     | +0.255      | 0.019   | +0.137 | +0.964   |                       |
+| Mistral 7B    | Mistral | 7.2B   | +0.313      | 0.001   | +0.156 | +0.995   |                       |
+| Llama 3.1 8B  | Llama   | 8B     | +0.088      | ---     | +0.054 | ---      | Preliminary (3 seeds) |
+| Qwen 2.5 14B  | Qwen    | 14B    | +0.214      | 0.032   | +0.096 | +0.851   |                       |
 
 All models use the 7-seed protocol with 350 ex/dim unless noted. rho_partial is Spearman partial correlation after controlling for max softmax and activation norm. r_OC is the residual after controlling for a 64-unit output-layer predictor. tau_seed is mean pairwise Spearman across probe initializations.
 
@@ -67,7 +67,7 @@ just install-hooks                 # ruff on commit, version check on push
 
 just test                          # run tests (54 pass, CPU only)
 just check                         # lint + format + version
-just smoke-gpu                     # end-to-end smoke test (GPT-2 124M, ~3 min CPU)
+just smoke-gpu                     # end-to-end smoke test (GPT-2 124M, CPU)
 ```
 
 ## Adding a new model
@@ -75,22 +75,18 @@ just smoke-gpu                     # end-to-end smoke test (GPT-2 124M, ~3 min C
 The most valuable contribution is data from a new architecture family. One file, one command:
 
 ```bash
-# On GPU (RunPod, Colab, or local):
+# On any GPU with 16GB+ VRAM:
 pip install transformers datasets scipy scikit-learn
 python run_model.py --model <hf-model-id> --output <name>_results.json
 ```
 
-A 7B model takes ~2 hours on an H100. The script is self-contained (no local imports). Token budgets should be at least 200 ex/dim (target 350 for models above 3B).
+The script is self-contained (no local imports). Token budgets should be at least 200 ex/dim (target 350 for models above 3B).
 
-Then integrate:
+Then add to `analysis/load_results.py` and `figures/style.py`, and run:
 
 ```bash
-cp <name>_results.json results/                 # 1. commit the JSON
-# 2. add one tuple to analysis/load_results.py:
-#    ('name_results.json', 7.0, 'Name-7B'),
-# 3. add color + marker to figures/style.py
-uv run python analysis/run_all.py               # 4. updated stats
-just figures                                     # 5. new point in Figure 1
+uv run python analysis/run_all.py     # updated stats
+just figures                          # new point in Figure 1
 ```
 
 See `results/README.md` for the output schema and `mistral7b_results.json` for a complete example.
@@ -108,37 +104,36 @@ This produces the permutation test (p = 0.004 with 5 families), mixed-effects mo
 ## Repository structure
 
 ```
-src/                       Core library
+src/                         Core library
   probe.py                   Shared probing functions (partial correlation,
                                activation collection, probe training)
   observe.py                 MLP observer (phases 1-3)
   transformer_observe.py     Transformer observer (phases 5-9)
   selective_prediction.py    TriviaQA selective prediction
 
-scripts/                   GPU data collection
+scripts/                     GPU data collection
   run_model.py               Single entry point for any HuggingFace model
   roc_width_sweep.py         Output-controlled residual width sweep
 
-analysis/                  Statistical analysis (all CPU, no GPU needed)
+analysis/                    Statistical analysis (all CPU, no GPU needed)
   load_results.py            Single source of truth for result loading
   run_all.py                 Run all analysis scripts
   permutation_test.py        Exact permutation test for family effect
   meta_regression.py         Mixed-effects model + variance decomposition
   exclusive_catch_rates.py   Multi-rate exclusive catch analysis
-  nonlinear_probe.py         Linear vs MLP probe comparison
   ancova_family.py           ANCOVA supplement (see pseudoreplication note)
   selectivity.py             Random head baselines + control gap
   funnel_plot.py             Publication bias diagnostic
 
-figures/                   Paper figure generation
+figures/                     Paper figure generation
   generate_all.py            Regenerate all figures
   fig_cross_family.py        Cross-family scaling (Figure 1)
   fig_layer_profiles.py      Qwen vs Llama layer sweep (Figure 2)
   fig_waterfall.py           Control sensitivity cascade (Figure 3)
   fig_exdim.py               Token budget sensitivity (Figure 4)
 
-results/                   All result JSONs (committed, reproducible)
-tests/                     Pytest suite (54 tests)
+results/                     All result JSONs (committed, reproducible)
+tests/                       Pytest suite (54 tests)
 ```
 
 ## Citation

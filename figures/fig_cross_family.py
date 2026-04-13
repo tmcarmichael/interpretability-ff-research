@@ -107,7 +107,7 @@ def main():
 
     ax.set_xscale("log")
     ax.set_xlabel("Parameters (B)")
-    ax.set_ylabel(r"$\rho_{\mathrm{partial}}$")
+    ax.set_ylabel(r"$\rho_{\mathrm{partial}}$ (confidence-controlled)", fontsize=8)
     ax.set_ylim(-0.02, 0.45)
     ax.axhline(0, color="gray", linewidth=0.5, linestyle="-", alpha=0.3)
 
@@ -118,12 +118,13 @@ def main():
 
     ax.legend(
         loc="upper left",
-        fontsize=8,
+        fontsize=7,
         framealpha=0.9,
-        handlelength=1.2,
-        handletextpad=0.4,
-        borderpad=0.3,
-        labelspacing=0.3,
+        handlelength=1.0,
+        handletextpad=0.3,
+        borderpad=0.2,
+        labelspacing=0.2,
+        markerscale=0.8,
     )
     ax.grid(True, alpha=0.2)
 

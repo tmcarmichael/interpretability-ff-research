@@ -1,6 +1,6 @@
 """r_OC width sweep: test whether a higher-capacity output predictor absorbs the signal.
 
-Model: Qwen/Qwen2.5-7B | GPU: H100 SXM 80GB | 3 eval seeds | 350 ex/dim
+Model: Qwen/Qwen2.5-7B | 3 eval seeds | 350 ex/dim
 Widths: 64 (baseline), 128, 256, 512
 Protocol: train MLP predictor on output-layer activations -> loss, then measure
   residual partial correlation of mid-layer observer after controlling for

@@ -4,8 +4,7 @@ Runs with minimal token budget (50 ex/dim, batch 4) to verify the full
 pipeline: data loading, layer sweep, multi-seed eval, test split, baselines,
 output-controlled, cross-domain, control sensitivity, and flagging.
 
-This test takes ~2-3 minutes on CPU and downloads GPT-2 124M (~500MB) on
-first run. It validates the output JSON schema, not exact numeric values.
+Validates the output JSON schema, not exact numeric values.
 """
 
 import json

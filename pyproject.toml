@@ -23,8 +23,10 @@ classifiers = [
 dependencies = [
     "matplotlib>=3.8.0",
     "numpy>=1.26.0",
+    "pandas>=2.0.0",
     "scikit-learn>=1.4.0",
     "scipy>=1.12.0",
+    "statsmodels>=0.14.0",
     "torch>=2.2.0",
     "torchvision>=0.17.0",
 ]
@@ -72,7 +74,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"analysis/nonlinear_probe.py" = ["I001"]    # inline import gc after del model
+"scripts/nonlinear_probe.py" = ["I001"]    # inline import gc after del model
 "scripts/legacy/auxiliary_loss.py" = ["I001"] # inline import time for MPS sleep
 "analysis/generate_data_macros.py" = ["I001"] # sys.path before import
 "analysis/generate_tables.py" = ["I001"]      # sys.path before import

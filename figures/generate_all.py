@@ -15,10 +15,10 @@ FIGURES_DIR = Path(__file__).resolve().parent
 
 # All figure modules in order
 FIGURE_MODULES = [
-    'fig_cross_family',
-    'fig_layer_profiles',
-    'fig_waterfall',
-    'fig_exdim',
+    "fig_cross_family",
+    "fig_layer_profiles",
+    "fig_waterfall",
+    "fig_exdim",
 ]
 
 
@@ -26,7 +26,7 @@ def main():
     # Ensure figures/ is importable
     sys.path.insert(0, str(FIGURES_DIR))
 
-    print(f'Generating {len(FIGURE_MODULES)} figures...\n')
+    print(f"Generating {len(FIGURE_MODULES)} figures...\n")
     failures = []
 
     for name in FIGURE_MODULES:
@@ -35,20 +35,20 @@ def main():
             mod = importlib.import_module(name)
             mod.main()
             dt = time.time() - t0
-            print(f'  [{dt:.1f}s] {name}\n')
+            print(f"  [{dt:.1f}s] {name}\n")
         except Exception as e:
             dt = time.time() - t0
-            print(f'  [{dt:.1f}s] {name} FAILED: {e}\n')
+            print(f"  [{dt:.1f}s] {name} FAILED: {e}\n")
             failures.append((name, e))
 
     if failures:
-        print(f'\n{len(failures)} figure(s) failed:')
+        print(f"\n{len(failures)} figure(s) failed:")
         for name, e in failures:
-            print(f'  {name}: {e}')
+            print(f"  {name}: {e}")
         sys.exit(1)
     else:
-        print(f'All {len(FIGURE_MODULES)} figures generated.')
+        print(f"All {len(FIGURE_MODULES)} figures generated.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -7,8 +7,8 @@ component the linear probe misses.
 
 Runs on one model at a time. Needs GPU or MPS for activation collection.
 
-Usage: cd nn-observability && uv run python analysis/nonlinear_probe.py --model Qwen/Qwen2.5-7B
-       cd nn-observability && uv run python analysis/nonlinear_probe.py --model Qwen/Qwen2.5-14B --peak-layer 30
+Usage: cd nn-observability && uv run python scripts/nonlinear_probe.py --model Qwen/Qwen2.5-7B
+       cd nn-observability && uv run python scripts/nonlinear_probe.py --model Qwen/Qwen2.5-14B --peak-layer 30
 """
 
 import argparse
@@ -376,7 +376,7 @@ def main():
         "swept_hp": {"per_seed": swept_results, "best_mlp_mean": best_swept, "delta_mean": delta_swept},
         "conclusion": "linear_sufficient" if abs(delta_swept) < 0.02 else "nonlinear_advantage",
     }
-    out_path = Path(__file__).parent / f"nonlinear_probe_{args.model.split('/')[-1]}.json"
+    out_path = Path(__file__).parent.parent / "results" / f"nonlinear_probe_{args.model.split('/')[-1]}.json"
     with open(out_path, "w") as f:
         json.dump(out, f, indent=2)
     print(f"Saved {out_path}")

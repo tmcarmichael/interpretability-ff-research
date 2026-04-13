@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -35,6 +37,8 @@ jobs:
     needs: lint-and-test
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -42,18 +46,18 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
-      - name: Install dependencies
-        run: uv sync
+      - name: Install dependencies (with transformer extras for smoke test)
+        run: uv sync --extra transformer
 
       - name: Smoke test run_model.py (GPT-2 124M, CPU)
-        run: uv run pytest tests/test_smoke_run_model.py -v --timeout=600
+        run: uv run pytest tests/test_smoke_run_model.py -v
 
       - name: Check version consistency
         run: |
           TOML_V=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           TAG_V=$(git tag -l 'v*' --sort=-v:refname | head -1 | sed 's/^v//')
           if [ -n "$TAG_V" ] && [ "$TOML_V" != "$TAG_V" ]; then
-            echo "WARNING: pyproject.toml ($TOML_V) != latest tag (v$TAG_V)"
-          else
-            echo "Version: $TOML_V (matches tag)"
+            echo "ERROR: pyproject.toml ($TOML_V) != latest tag (v$TAG_V)"
+            exit 1
           fi
+          echo "Version: $TOML_V (matches tag)"

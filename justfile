@@ -131,9 +131,9 @@ all device=default_device:
 smoke device=default_device:
     uv run src/train.py --dataset mnist --epochs 5 --seeds 1 --device {{device}}
 
-# Smoke test for run_model.py (GPT-2 124M, ~3 min on CPU)
+# Smoke test for run_model.py (GPT-2 124M, CPU)
 smoke-gpu:
-    uv run pytest tests/test_smoke_run_model.py -v --timeout=600
+    uv run pytest tests/test_smoke_run_model.py -v
 
 # Run metric tests
 test:
@@ -176,18 +176,18 @@ install-hooks:
     uv run pre-commit install
     uv run pre-commit install --hook-type pre-push
 
-# Lint source files
+# Lint all Python (matches CI scope)
 lint:
-    uv run ruff check src/
+    uv run ruff check src/ scripts/ figures/ analysis/
 
-# Auto-format source files
+# Auto-format all Python
 fmt:
-    uv run ruff format src/
+    uv run ruff format src/ scripts/ figures/ analysis/
 
 # Run all checks (lint + format check + version consistency)
 check:
-    uv run ruff check src/
-    uv run ruff format --check src/
+    uv run ruff check src/ scripts/ figures/ analysis/
+    uv run ruff format --check src/ scripts/ figures/ analysis/
     @just check-version
 
 # Verify pyproject.toml version matches latest git tag

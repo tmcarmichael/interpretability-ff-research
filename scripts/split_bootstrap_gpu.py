@@ -4,10 +4,7 @@ Resamples WikiText train documents 30 times, retrains probe on each,
 evaluates on fixed test set. Reports variance of partial correlation.
 If tight, the signal is robust to document selection.
 
-Optimized for H100: pre-tokenize once, batch_size=48, sorted length
-packing, forward hooks, probe training on GPU.
-
-Upload to RunPod /workspace/ and run:
+Usage:
   pip install transformers datasets scipy
   python split_bootstrap_gpu.py --model Qwen/Qwen2.5-7B --peak-layer 17
 

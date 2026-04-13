@@ -1,6 +1,5 @@
 #!/bin/bash
 # Run nonlinear probe on all v1 paper models + Llama multi-layer sweep
-# Upload to /workspace/ on RunPod and run: bash /workspace/run_all_nonlinear.sh
 
 set -e
 export HF_HOME=/workspace/hf_cache

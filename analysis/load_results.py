@@ -32,7 +32,7 @@ QWEN_MODELS = [
     ("qwen1_5b_v3_results.json", 1.5, "Qwen-1.5B"),
     # v3 results with CS (will fall back to v2 if v3 not yet available)
     ("qwen3b_v3_results.json", 3.0, "Qwen-3B"),
-    # v3 results from RunPod (will fall back to older if not yet available)
+    # v3 results (will fall back to older if not yet available)
     ("qwen7b_v3_results.json", 7.6, "Qwen-7B"),
     ("qwen14b_v3_results.json", 14.0, "Qwen-14B"),
     # 32B excluded from v1 (reconstructed data, incomplete battery)
