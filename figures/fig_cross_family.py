@@ -1,39 +1,79 @@
 """Figure 1: Cross-family scaling (pcorr vs parameters).
 
 One point per model, colored by family. Shows Qwen flat at ~+0.25,
-GPT-2 flat at ~+0.29, Gemma high, Llama declining from 1B to 3B/8B.
+GPT-2 flat at ~+0.29, Gemma high, Llama cliff from 1B to 3B/8B.
 Preliminary points (3-seed, lower ex/dim) use open markers.
 Black error bars drawn in front of markers for visibility.
 
 Usage: cd nn-observability && uv run python figures/fig_cross_family.py
 """
 
+import json
+
 import matplotlib.pyplot as plt
 import numpy as np
-from style import MARKERS, PALETTE, apply_style, save_fig  # must import first (sets up sys.path)
+from style import MARKERS, PALETTE, RESULTS_DIR, apply_style, save_fig
 from load_results import load_all_models
 
 OUTPUT_NAME = "cross_family_scaling.pdf"
 
-# Preliminary Llama points (3-seed, lower ex/dim) not in load_results
-PRELIMINARY = [
-    {
-        "label": "Llama-1B",
-        "family": "Llama",
-        "params_b": 1.236,
-        "pcorr_mean": 0.250,
-        "pcorr_std": 0.002,
-        "source": "cross_family.json (3 seeds, 150 ex/dim)",
-    },
-    {
-        "label": "Llama-8B",
-        "family": "Llama",
-        "params_b": 8.0,
-        "pcorr_mean": 0.088,
-        "pcorr_std": 0.004,
-        "source": "llama8b_comprehensive.json (3 seeds)",
-    },
-]
+# Points not in load_results scope but in the figure.
+# Llama 1B: full protocol but excluded from family-level stats
+# (different architecture from 3B, inflates within-family variance).
+# Llama 8B: full protocol in progress, preliminary 3-seed data shown.
+EXTRA_POINTS = []
+
+# Llama 1B: load from committed full-protocol JSON if available
+_llama1b_path = RESULTS_DIR / "llama1b_results.json"
+if _llama1b_path.exists():
+    _d = json.loads(_llama1b_path.read_text())
+    EXTRA_POINTS.append(
+        {
+            "label": "Llama-1B",
+            "family": "Llama",
+            "params_b": _d["n_params_b"],
+            "pcorr_mean": _d["partial_corr"]["mean"],
+            "pcorr_std": _d["partial_corr"].get("std", 0),
+            "preliminary": False,
+        }
+    )
+else:
+    EXTRA_POINTS.append(
+        {
+            "label": "Llama-1B",
+            "family": "Llama",
+            "params_b": 1.236,
+            "pcorr_mean": 0.250,
+            "pcorr_std": 0.002,
+            "preliminary": True,
+        }
+    )
+
+# Llama 8B: check for full-protocol JSON, fall back to preliminary
+_llama8b_path = RESULTS_DIR / "llama8b_results.json"
+if _llama8b_path.exists():
+    _d = json.loads(_llama8b_path.read_text())
+    EXTRA_POINTS.append(
+        {
+            "label": "Llama-8B",
+            "family": "Llama",
+            "params_b": _d["n_params_b"],
+            "pcorr_mean": _d["partial_corr"]["mean"],
+            "pcorr_std": _d["partial_corr"].get("std", 0),
+            "preliminary": False,
+        }
+    )
+else:
+    EXTRA_POINTS.append(
+        {
+            "label": "Llama-8B",
+            "family": "Llama",
+            "params_b": 8.0,
+            "pcorr_mean": 0.088,
+            "pcorr_std": 0.004,
+            "preliminary": True,
+        }
+    )
 
 
 def main():
@@ -42,7 +82,6 @@ def main():
 
     fig, ax = plt.subplots(figsize=(5.5, 3.2))
 
-    # Collect all points for two-pass drawing: markers first, error bars on top
     points = []
 
     for _label, m in sorted(models.items(), key=lambda x: x[1]["params_b"]):
@@ -59,18 +98,18 @@ def main():
             }
         )
 
-    for p in PRELIMINARY:
+    for p in EXTRA_POINTS:
         points.append(
             {
                 "x": p["params_b"],
                 "y": p["pcorr_mean"],
                 "yerr": p["pcorr_std"],
                 "family": p["family"],
-                "preliminary": True,
+                "preliminary": p["preliminary"],
             }
         )
 
-    # Pass 1: colored markers (behind)
+    # Pass 1: colored markers
     plotted_families = set()
     for p in points:
         fam = p["family"]
@@ -90,7 +129,7 @@ def main():
         )
         plotted_families.add(fam)
 
-    # Pass 2: black error bars (in front)
+    # Pass 2: black error bars in front
     for p in points:
         if p["yerr"] > 0:
             ax.errorbar(
@@ -111,13 +150,12 @@ def main():
     ax.set_ylim(-0.02, 0.45)
     ax.axhline(0, color="gray", linewidth=0.5, linestyle="-", alpha=0.3)
 
-    # Noise floor: below +0.15, signal is unreliable (ex/dim detection
-    # threshold from Section 6)
+    # Noise floor band
     ax.axhspan(0, 0.15, color="gray", alpha=0.06, zorder=0)
     ax.axhline(0.15, color="gray", linewidth=0.6, linestyle=":", alpha=0.4)
 
     ax.legend(
-        loc="upper left",
+        loc="lower right",
         fontsize=7,
         framealpha=0.9,
         handlelength=1.0,

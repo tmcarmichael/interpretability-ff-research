@@ -1,7 +1,7 @@
 [project]
 name = "nn-observability"
-version = "2.2.1"
-description = "Architecture predicts linear readability of decision quality in transformer activations. Cross-family evaluation with confidence controls across five model families."
+version = "2.3.0"
+description = "Architecture predicts linear readability of decision quality in transformer activations. Cross-family evaluation with confidence controls across six model families."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Thomas Carmichael"}]
