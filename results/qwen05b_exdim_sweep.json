@@ -229,5 +229,11 @@
       }
     }
   },
-  "note": "ex/dim sensitivity figure. 600 and 1000 ex/dim in separate files. 800 fills the gap to check plateau."
+  "note": "ex/dim sensitivity figure. 600 and 1000 ex/dim in separate files. 800 fills the gap to check plateau.",
+  "provenance": {
+    "model_revision": "060db649",
+    "script": "scripts/run_model.py",
+    "timestamp": "2026-04-12T13:04:08-05:00",
+    "backfilled": true
+  }
 }

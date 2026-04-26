@@ -62,5 +62,11 @@
       "delta_from_baseline": 0.10539115287664597
     },
     "conclusion": "signal_survives"
+  },
+  "provenance": {
+    "model_revision": "d1497293",
+    "script": "scripts/roc_width_sweep.py",
+    "timestamp": "2026-04-13T22:55:02-05:00",
+    "backfilled": true
   }
 }

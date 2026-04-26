@@ -70,15 +70,15 @@ def test_pcorr_in_valid_range():
         assert -1.0 <= val <= 1.0, f"{label} partial_corr.mean={val} out of range"
 
 
-def test_six_families():
-    """v2.2.1+ should have six families."""
+def test_seven_families():
+    """v3.2.0+ should have seven families."""
     models = load_all_models()
     families = {m["family"] for m in models.values()}
-    for expected in ("GPT-2", "Qwen", "Llama", "Gemma", "Mistral", "Phi"):
+    for expected in ("GPT-2", "Qwen", "Llama", "Gemma", "Mistral", "Phi", "Pythia"):
         assert expected in families, f"Family {expected} missing"
 
 
 def test_minimum_model_count():
-    """v2.2.1+ should have at least 13 models."""
+    """v3.2.0+ should have at least 16 models."""
     models = load_all_models()
-    assert len(models) >= 13, f"Only {len(models)} models loaded, expected >= 13"
+    assert len(models) >= 16, f"Only {len(models)} models loaded, expected >= 16"

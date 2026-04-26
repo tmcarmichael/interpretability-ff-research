@@ -1,7 +1,7 @@
 [project]
 name = "nn-observability"
-version = "3.1.0"
-description = "Whether activation monitoring can catch high-confidence transformer errors depends on architecture: some configurations preserve a linearly readable signal after controlling for output confidence, while others collapse. Code and data for 22 models across 7 families."
+version = "3.2.0"
+description = "Whether activation monitoring can catch high-confidence transformer errors depends on architecture: some configurations preserve a linearly readable signal after controlling for output confidence, while others collapse. Code and data for 25 models across 7 families."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Thomas Carmichael"}]

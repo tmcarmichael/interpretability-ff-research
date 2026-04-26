@@ -104,6 +104,75 @@ def validate_results_json(data: dict, filename: str, strict: bool = False) -> li
     return warnings
 
 
+DYNAMICS_FILES = [
+    ("pythia_1b_dynamics_results.json", "Pythia-1B (16L/8H) dynamics"),
+    ("pythia_14b_dynamics_results.json", "Pythia-1.4B (24L/16H) dynamics"),
+]
+
+DYNAMICS_REQUIRED_TOP = {
+    "model": str,
+    "experiment": str,
+    "n_layers": int,
+    "hidden_dim": int,
+    "heads": int,
+    "architecture_class": str,
+    "provenance": dict,
+    "protocol": dict,
+    "checkpoints": dict,
+}
+
+DYNAMICS_REQUIRED_CHECKPOINT: dict[str, type | tuple[type, ...]] = {
+    "step": int,
+    "tokens_seen": (int, float),
+    "revision": str,
+    "peak_layer": int,
+    "peak_layer_frac": (int, float),
+    "partial_corr": dict,
+    "output_controlled": dict,
+    "perplexity": (int, float),
+}
+
+
+def validate_dynamics_json(data: dict, filename: str) -> list[str]:
+    """Validate a checkpoint-dynamics JSON. Returns list of warnings."""
+    warnings = []
+    for field, expected_type in DYNAMICS_REQUIRED_TOP.items():
+        val = data.get(field)
+        if val is None:
+            warnings.append(f"{filename}: missing required field '{field}'")
+        elif not isinstance(val, expected_type):
+            warnings.append(
+                f"{filename}: field '{field}' has type {type(val).__name__}, expected {expected_type}"
+            )
+
+    checkpoints = data.get("checkpoints", {})
+    if not checkpoints:
+        warnings.append(f"{filename}: no checkpoints found")
+        return warnings
+
+    for ck_name, ck_data in checkpoints.items():
+        for field, expected in DYNAMICS_REQUIRED_CHECKPOINT.items():
+            val = ck_data.get(field)
+            if val is None:
+                warnings.append(f"{filename}: checkpoint '{ck_name}' missing '{field}'")
+            elif not isinstance(val, expected):  # type: ignore[arg-type]
+                warnings.append(
+                    f"{filename}: checkpoint '{ck_name}' field '{field}' has type {type(val).__name__}"
+                )
+
+        pc = ck_data.get("partial_corr", {})
+        pc_mean = pc.get("mean")
+        if isinstance(pc_mean, (int, float)) and abs(pc_mean) > 1.0:
+            warnings.append(f"{filename}: checkpoint '{ck_name}' partial_corr.mean={pc_mean} outside [-1, 1]")
+        per_seed = pc.get("per_seed")
+        if isinstance(per_seed, list) and len(per_seed) < 3:
+            warnings.append(
+                f"{filename}: checkpoint '{ck_name}' partial_corr.per_seed has {len(per_seed)} seeds"
+            )
+
+    return warnings
+
+
 GPT2_MODELS = [
     ("gpt2", 0.124, "GPT2-124M"),
     ("gpt2-medium", 0.355, "GPT2-355M"),
@@ -342,6 +411,22 @@ def validate_all(strict: bool = False) -> int:
             total_warnings += len(warnings)
         else:
             print(f"  OK: {path.name}")
+
+    for fname, label in DYNAMICS_FILES:
+        path = RESULTS_DIR / fname
+        if not path.exists():
+            print(f"  MISSING: {fname} ({label})")
+            total_warnings += 1
+            continue
+        d = json.loads(path.read_text())
+        warnings = validate_dynamics_json(d, path.name)
+        if warnings:
+            for w in warnings:
+                print(f"  {w}")
+            total_warnings += len(warnings)
+        else:
+            print(f"  OK: {path.name}")
+
     return total_warnings
 
 

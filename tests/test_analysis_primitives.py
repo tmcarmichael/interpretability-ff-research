@@ -62,7 +62,7 @@ class TestNUniquePermutations:
         assert n_unique_permutations(["A", "A", "A"]) == 1
 
     def test_known_paper_case(self):
-        """13 models in 6 families with paper's actual counts."""
+        """16 models in 7 families with paper's actual counts."""
         families = (
             ["Qwen"] * 5 + ["Llama"] * 3 + ["GPT-2"] * 1 + ["Mistral"] * 1 + ["Phi"] * 1 + ["Gemma"] * 2
         )

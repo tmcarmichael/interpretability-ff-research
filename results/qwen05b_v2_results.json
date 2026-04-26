@@ -126,5 +126,11 @@
   },
   "baselines": {
     "random_head": -0.0547
+  },
+  "provenance": {
+    "model_revision": "060db649",
+    "script": "scripts/run_model.py",
+    "timestamp": "2026-04-12T13:04:08-05:00",
+    "backfilled": true
   }
 }

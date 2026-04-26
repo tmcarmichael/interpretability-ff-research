@@ -168,5 +168,11 @@
         "observer_exclusive": 10921.333333333334
       }
     }
+  },
+  "provenance": {
+    "model_revision": "d04e592b",
+    "script": "scripts/run_model.py",
+    "timestamp": "2026-04-23T01:08:09-05:00",
+    "backfilled": true
   }
 }

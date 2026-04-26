@@ -1,6 +1,6 @@
 # Results directory
 
-_Updated 2026-04-25 for repo v3.1.0._
+_Updated 2026-04-26 for repo v3.2.0._
 
 Every JSON file here is a committed experimental result. Analysis scripts read from these files via `analysis/load_results.py`.
 
@@ -44,6 +44,15 @@ Every JSON file here is a committed experimental result. Analysis scripts read f
 | `pythia_6.9b_results.json` | Pythia 6.9B | 7-seed |
 | `pythia_12b_results.json` | Pythia 12B | 7-seed |
 
+## Checkpoint dynamics (within-recipe controlled)
+
+| File | Model | Notes |
+|---|---|---|
+| `pythia_1b_dynamics_results.json` | Pythia 1B (16L/8H, d=2048) | 10 checkpoints, step 256 to 143000; healthy trajectory |
+| `pythia_14b_dynamics_results.json` | Pythia 1.4B (24L/16H, d=2048) | 10 checkpoints, step 256 to 143000; collapse trajectory |
+
+Matched hidden dimension ($d = 2048$). Both start healthy at step 256; the 1B recovers after a mid-training dip, the 1.4B converges collapsed. Per-checkpoint fields: partial_corr (7-seed), output_controlled (3-seed), perplexity, peak layer, and HuggingFace revision hash. These files use a different schema from the single-model results and are validated separately by `validate_dynamics_json` in `analysis/load_results.py`.
+
 ## Downstream tasks
 
 | File | Task | Model |
@@ -67,6 +76,7 @@ Every JSON file here is a committed experimental result. Analysis scripts read f
 | `shuffle_test_gpt2.json` | GPT-2 124M | 10 permutations, shuffled labels |
 | `roc_width_sweep_results.json` | Qwen 2.5 7B | Output predictor 64-512 units |
 | `qwen05b_exdim_sweep.json` | Qwen 2.5 0.5B | Token budget sensitivity 150-1000 ex/dim |
+| `split_bootstrap_Qwen2.5-7B.json` | Qwen 2.5 7B | 30-resample document-level bootstrap |
 | `nonlinear_probe_gpt2.json` | GPT-2 124M | Linear vs MLP |
 | `nonlinear_probe_Qwen2.5-0.5B.json` | Qwen 2.5 0.5B | Linear vs MLP |
 | `nonlinear_probe_Qwen2.5-1.5B.json` | Qwen 2.5 1.5B | Linear vs MLP |

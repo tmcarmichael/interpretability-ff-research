@@ -161,5 +161,11 @@
   },
   "flagging_6a": {
     "_incomplete": "Pod stalled during Phase 5. Rerun needed."
+  },
+  "provenance": {
+    "model_revision": "cc012e0a",
+    "script": "scripts/run_model.py",
+    "timestamp": "2026-04-14T18:26:32-05:00",
+    "backfilled": true
   }
 }

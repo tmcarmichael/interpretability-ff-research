@@ -126,5 +126,11 @@
     },
     "absorbed_fraction_fixed": 0.406,
     "absorbed_fraction_proportional": 0.317
+  },
+  "provenance": {
+    "model_revision": "607a30d7",
+    "script": "src/transformer_observe.py",
+    "timestamp": "2026-04-07T01:32:32-05:00",
+    "backfilled": true
   }
 }

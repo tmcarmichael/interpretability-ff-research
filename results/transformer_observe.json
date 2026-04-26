@@ -2130,5 +2130,11 @@
       "openwebtext": 0.29639950758296996,
       "code": 1.8603816956617671
     }
+  },
+  "provenance": {
+    "model_revision": "607a30d7",
+    "script": "src/transformer_observe.py",
+    "timestamp": "2026-04-07T01:32:32-05:00",
+    "backfilled": true
   }
 }

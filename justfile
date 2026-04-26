@@ -180,6 +180,22 @@ pythia-suite:
     uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-6.9b --output pythia_6.9b_results.json
     uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-12b --output pythia_12b_results.json
 
+# Downstream QA tasks (3 tasks x 3 instruct models = 9 evaluations)
+# Each trains a WikiText probe then evaluates on the downstream task.
+# SQuAD 2.0: exact-match scoring on 1000 answerable questions (validation split).
+# MedQA-USMLE: letter-match on 1000 4-option questions (test split).
+# TruthfulQA: substring/overlap heuristic on ~817 questions (validation split).
+# Exclusive catch = errors flagged by observer but not confidence, as % of total errors.
+downstream model device=default_device:
+    uv run --extra transformer python scripts/rag_hallucination.py --model {{model}} --device {{device}}
+    uv run --extra transformer python scripts/medqa_selective.py --model {{model}} --device {{device}}
+    uv run --extra transformer python scripts/truthfulqa_hallucination.py --model {{model}} --device {{device}}
+
+downstream-all device=default_device:
+    just downstream Qwen/Qwen2.5-7B-Instruct {{device}}
+    just downstream mistralai/Mistral-7B-Instruct-v0.3 {{device}}
+    just downstream microsoft/Phi-3-mini-4k-instruct {{device}}
+
 # Install pre-commit hooks (ruff on commit, version check on push)
 install-hooks:
     uv run pre-commit install
