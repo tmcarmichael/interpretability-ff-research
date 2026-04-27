@@ -167,14 +167,14 @@ Cite the paper and the code separately. Both share a Zenodo concept DOI that res
   journal={Zenodo pre-print},
   doi={10.5281/zenodo.19435674},
   url={https://doi.org/10.5281/zenodo.19435674},
-  note={v3.2.0}
+  note={v3.3.0}
 }
 
 @software{carmichael2026code,
   title={nn-observability: code for ``Architecture Determines Observability in Transformers''},
   author={Carmichael, Thomas},
   year={2026},
-  version={3.2.0},
+  version={3.3.0},
   doi={10.5281/zenodo.19435674},
   url={https://github.com/tmcarmichael/nn-observability}
 }
