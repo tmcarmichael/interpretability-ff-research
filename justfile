@@ -186,15 +186,15 @@ pythia-suite:
 # MedQA-USMLE: letter-match on 1000 4-option questions (test split).
 # TruthfulQA: substring/overlap heuristic on ~817 questions (validation split).
 # Exclusive catch = errors flagged by observer but not confidence, as % of total errors.
-downstream model device=default_device:
-    uv run --extra transformer python scripts/rag_hallucination.py --model {{model}} --device {{device}}
-    uv run --extra transformer python scripts/medqa_selective.py --model {{model}} --device {{device}}
-    uv run --extra transformer python scripts/truthfulqa_hallucination.py --model {{model}} --device {{device}}
+downstream model:
+    uv run --extra transformer python scripts/rag_hallucination.py --model {{model}}
+    uv run --extra transformer python scripts/medqa_selective.py --model {{model}}
+    uv run --extra transformer python scripts/truthfulqa_hallucination.py --model {{model}}
 
-downstream-all device=default_device:
-    just downstream Qwen/Qwen2.5-7B-Instruct {{device}}
-    just downstream mistralai/Mistral-7B-Instruct-v0.3 {{device}}
-    just downstream microsoft/Phi-3-mini-4k-instruct {{device}}
+downstream-all:
+    just downstream Qwen/Qwen2.5-7B-Instruct
+    just downstream mistralai/Mistral-7B-Instruct-v0.3
+    just downstream microsoft/Phi-3-mini-4k-instruct
 
 # Install pre-commit hooks (ruff on commit, version check on push)
 install-hooks:

@@ -1,6 +1,6 @@
 # Paper figures
 
-_Updated 2026-04-26 for repo v3.2.0._
+_Updated 2026-04-26 for repo v3.3.0._
 
 PNG copies of the seven figures used in the paper and referenced from the repo README. Captions are condensed from the paper PDF; see the paper repo for the full typeset versions.
 

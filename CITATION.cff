@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: Carmichael
     given-names: Thomas
-version: "3.2.0"
+version: "3.3.0"
 date-released: "2026-04-26"
 license: MIT
 doi: "10.5281/zenodo.19435674"
