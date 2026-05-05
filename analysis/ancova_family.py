@@ -10,10 +10,10 @@ import sys
 
 import numpy as np
 
-from analysis.load_results import load_all_models, load_per_seed
+from analysis.load_results import SCOPES, load_all_models, load_per_seed
 
 
-def run_ancova() -> None:
+def run_ancova(scope: str | None = "cross_family_14") -> None:
     """Fit family + log10(params) ANCOVA on per-seed observations and print results.
 
     Reported p-values are anticonservative (per-seed observations are not
@@ -28,7 +28,7 @@ def run_ancova() -> None:
         print("  uv pip install pandas statsmodels")
         sys.exit(1)
 
-    rows = load_per_seed()
+    rows = load_per_seed(scope=scope)
     if len(rows) < 5:
         print(f"Only {len(rows)} observations.")
         sys.exit(1)
@@ -36,9 +36,9 @@ def run_ancova() -> None:
     df = pd.DataFrame(rows, columns=["family", "model", "params_b", "seed_idx", "partial_corr"])
     df["log_params"] = np.log10(df["params_b"])
 
-    print(f"Loaded {len(df)} observations from {df['family'].nunique()} families")
+    print(f"Loaded {len(df)} observations from {df['family'].nunique()} families (scope={scope})")
     # Report missing
-    load_all_models(verbose=True)
+    load_all_models(verbose=True, scope=scope)
     print()
 
     print("=== Data summary ===")
@@ -102,4 +102,9 @@ def run_ancova() -> None:
 
 
 if __name__ == "__main__":
-    run_ancova()
+    import argparse
+
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--scope", default="cross_family_14", choices=sorted(SCOPES), help="Named model scope.")
+    args = p.parse_args()
+    run_ancova(scope=args.scope)

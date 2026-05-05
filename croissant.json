@@ -1,0 +1,2808 @@
+{
+  "@context": {
+    "@language": "en",
+    "@vocab": "https://schema.org/",
+    "sc": "https://schema.org/",
+    "cr": "http://mlcommons.org/croissant/",
+    "rai": "http://mlcommons.org/croissant/RAI/",
+    "dct": "http://purl.org/dc/terms/",
+    "annotation": "cr:annotation",
+    "arrayShape": "cr:arrayShape",
+    "citeAs": "cr:citeAs",
+    "column": "cr:column",
+    "conformsTo": "dct:conformsTo",
+    "containedIn": "cr:containedIn",
+    "data": {
+      "@id": "cr:data",
+      "@type": "@json"
+    },
+    "dataType": {
+      "@id": "cr:dataType",
+      "@type": "@vocab"
+    },
+    "equivalentProperty": "cr:equivalentProperty",
+    "examples": {
+      "@id": "cr:examples",
+      "@type": "@json"
+    },
+    "excludes": "cr:excludes",
+    "extract": "cr:extract",
+    "field": "cr:field",
+    "fileProperty": "cr:fileProperty",
+    "fileObject": "cr:fileObject",
+    "fileSet": "cr:fileSet",
+    "format": "cr:format",
+    "includes": "cr:includes",
+    "isArray": "cr:isArray",
+    "isLiveDataset": "cr:isLiveDataset",
+    "jsonPath": "cr:jsonPath",
+    "key": "cr:key",
+    "md5": "cr:md5",
+    "parentField": "cr:parentField",
+    "recordSet": "cr:recordSet",
+    "references": "cr:references",
+    "regex": "cr:regex",
+    "readLines": "cr:readLines",
+    "sdVersion": "cr:sdVersion",
+    "separator": "cr:separator",
+    "source": "cr:source",
+    "subField": "cr:subField",
+    "transform": "cr:transform",
+    "unArchive": "cr:unArchive",
+    "value": "cr:value"
+  },
+  "@type": "sc:Dataset",
+  "conformsTo": "http://mlcommons.org/croissant/1.1",
+  "sdVersion": "1.1",
+  "name": "nn-observability",
+  "description": "Whether activation monitoring can catch high-confidence transformer errors depends on architecture: some configurations preserve a linearly readable signal after controlling for output confidence, while others collapse. Code and data for 26 models across 7 families.",
+  "url": "https://github.com/tmcarmichael/nn-observability",
+  "version": "4.0.0",
+  "datePublished": "2026-05-05",
+  "license": "https://opensource.org/licenses/MIT",
+  "citeAs": "Carmichael, T. (2026). Architectural Observability Collapse in Transformers. Zenodo. https://doi.org/10.5281/zenodo.19435674",
+  "creator": {
+    "@type": "Person",
+    "name": "Thomas Carmichael"
+  },
+  "keywords": [
+    "neural network observability",
+    "transformer interpretability",
+    "decision quality",
+    "learned probes",
+    "confidence controls",
+    "architecture-dependent readability",
+    "partial correlation",
+    "cross-family evaluation",
+    "downstream QA transfer"
+  ],
+  "sameAs": "https://doi.org/10.5281/zenodo.19435674",
+  "isLiveDataset": false,
+  "distribution": [
+    {
+      "@type": "cr:FileObject",
+      "@id": "nn-observability-archive",
+      "name": "nn-observability-archive",
+      "description": "Source repository at v4.0.0. The sha256 is a merkle hash over (filename, sha256) pairs of every distribution file under results/, computed by scripts/generate_croissant.py; rerun the generator on a clean clone to verify.",
+      "contentUrl": "https://github.com/tmcarmichael/nn-observability/archive/refs/tags/v4.0.0.tar.gz",
+      "encodingFormat": "application/x-tar",
+      "sha256": "5ddd351d54c1586bee8c194d790c254b058d4995209d86b8d3343bc89b8648ce"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "model-revisions",
+      "name": "model-revisions",
+      "description": "Hugging Face model IDs and pinned commit hashes for every evaluated model.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "contentUrl": "results/model_revisions.json",
+      "encodingFormat": "application/json",
+      "sha256": "09bd675f5e8e389c3286d49142d9cd37a94d09eb9155cea73f4d6c68d4d7aaf8"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "dataset-revisions",
+      "name": "dataset-revisions",
+      "description": "Hugging Face dataset IDs and pinned commit hashes for every paper-cited evaluation corpus.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "contentUrl": "results/dataset_revisions.json",
+      "encodingFormat": "application/json",
+      "sha256": "a304a1bbfcb1e368dd6cecfb88f78a6dea1cf076e972e475227fd25baf92c2ed"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "manifest-verification",
+      "name": "manifest-verification",
+      "description": "Programmatic verification of every model_revisions entry against the live Hugging Face API.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "contentUrl": "results/manifest_verification/2026-05-03.json",
+      "encodingFormat": "application/json",
+      "sha256": "3093a699beb2b4636ccbc166ce0455bdbf7566a7c961ea816dbb26a8cb4cf904"
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "bootstrap-results",
+      "name": "bootstrap-results",
+      "description": "Document-level bootstrap on Qwen 7B (30 resamples).",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/qwen2.5-7b_bootstrap.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "dynamics-results",
+      "name": "dynamics-results",
+      "description": "Pythia checkpoint trajectory: pcorr and oc_residual across training steps.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/pythia-1.4b_dynamics.json",
+        "results/pythia-1b_dynamics.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "legacy-results",
+      "name": "legacy-results",
+      "description": "Pre-v3.0.0 phase-taxonomy outputs preserved as provenance.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/gpt-2-124m_sae-comparison.json",
+        "results/gpt-2_bottleneck-scaling.json",
+        "results/qwen2.5-0.5b_exdim-1000.json",
+        "results/qwen2.5-0.5b_exdim-sweep.json",
+        "results/transformer_observe.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "main-results",
+      "name": "main-results",
+      "description": "Per-model output of the canonical 350 ex/dim 7-seed observability protocol.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/gemma-3-1b_main.json",
+        "results/gemma-3-4b_main.json",
+        "results/gpt2-124m_main.json",
+        "results/gpt2-large_main.json",
+        "results/gpt2-medium_main.json",
+        "results/gpt2-xl_main.json",
+        "results/llama-3.1-8b_main.json",
+        "results/llama-3.2-1b-instruct_main.json",
+        "results/llama-3.2-1b_main.json",
+        "results/llama-3.2-3b_main.json",
+        "results/mistral-7b-instruct-v0.3_main.json",
+        "results/mistral-7b-v0.3_main.json",
+        "results/phi-3-mini_main.json",
+        "results/pythia-1.4b-deduped_main.json",
+        "results/pythia-1.4b_main.json",
+        "results/pythia-12b_main.json",
+        "results/pythia-160m_main.json",
+        "results/pythia-1b_main.json",
+        "results/pythia-2.8b_main.json",
+        "results/pythia-410m_main.json",
+        "results/pythia-6.9b_main.json",
+        "results/pythia-70m_main.json",
+        "results/qwen2.5-0.5b-instruct_main.json",
+        "results/qwen2.5-0.5b_main.json",
+        "results/qwen2.5-1.5b-instruct_main.json",
+        "results/qwen2.5-1.5b_main.json",
+        "results/qwen2.5-14b-instruct_main.json",
+        "results/qwen2.5-14b_main.json",
+        "results/qwen2.5-32b_main.json",
+        "results/qwen2.5-3b-instruct_main.json",
+        "results/qwen2.5-3b_main.json",
+        "results/qwen2.5-7b-instruct_main.json",
+        "results/qwen2.5-7b_main.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "mechanistic-results",
+      "name": "mechanistic-results",
+      "description": "Mean-ablation patching by layer/component (sign-only interpretation).",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/llama-3.2-1b_mechanistic.json",
+        "results/llama-3.2-3b_mechanistic.json",
+        "results/mistral-7b-v0.3_mechanistic.json",
+        "results/qwen2.5-7b_mechanistic.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "medqa-results",
+      "name": "medqa-results",
+      "description": "MedQA-USMLE multiple-choice exclusive-catch rates by flag rate.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/mistral-7b-instruct-v0.3_medqa.json",
+        "results/phi-3-mini_medqa.json",
+        "results/qwen2.5-7b-instruct_medqa.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "nonlinear-probe-multilayer-results",
+      "name": "nonlinear-probe-multilayer-results",
+      "description": "Multi-layer nonlinear-probe sweep on Llama 3B.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/llama-3.2-3b_nonlinear-probe-multilayer.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "nonlinear-probe-results",
+      "name": "nonlinear-probe-results",
+      "description": "Matched-HP and swept-HP MLP-vs-linear comparison per model.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/gemma-3-1b_nonlinear-probe.json",
+        "results/gpt-2-124m_nonlinear-probe.json",
+        "results/llama-3.2-3b_nonlinear-probe.json",
+        "results/pythia-1.4b_nonlinear-probe.json",
+        "results/pythia-410m_nonlinear-probe.json",
+        "results/qwen2.5-0.5b_nonlinear-probe.json",
+        "results/qwen2.5-1.5b_nonlinear-probe.json",
+        "results/qwen2.5-14b_nonlinear-probe.json",
+        "results/qwen2.5-3b_nonlinear-probe.json",
+        "results/qwen2.5-7b_nonlinear-probe.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "residualizer-split-results",
+      "name": "residualizer-split-results",
+      "description": "Split-fit OLS residualizer test (separate fit pool from probe pool).",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/gpt2-124m_residualizer-split.json",
+        "results/llama-3.2-3b_residualizer-split.json",
+        "results/pythia-1.4b_residualizer-split.json",
+        "results/pythia-1b_residualizer-split.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "shuffle-control-results",
+      "name": "shuffle-control-results",
+      "description": "Shuffled-label probe null distribution (10 permutations).",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/gpt-2-124m_shuffle-control.json",
+        "results/pythia-1.4b_shuffle-control.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "squad-results",
+      "name": "squad-results",
+      "description": "SQuAD 2.0 reading-comprehension exclusive-catch rates by flag rate.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/mistral-7b-instruct-v0.3_squad-rag.json",
+        "results/phi-3-mini_squad-rag.json",
+        "results/qwen2.5-7b-instruct_squad-rag.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "truthfulqa-results",
+      "name": "truthfulqa-results",
+      "description": "TruthfulQA generation exclusive-catch rates and AUC by flag rate.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/mistral-7b-instruct-v0.3_truthfulqa.json",
+        "results/phi-3-mini_truthfulqa.json",
+        "results/qwen2.5-7b-instruct_truthfulqa.json"
+      ]
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "width-sweep-results",
+      "name": "width-sweep-results",
+      "description": "Output-side MLP width sweep (64-512 units) on Qwen 7B.",
+      "containedIn": {
+        "@id": "nn-observability-archive"
+      },
+      "encodingFormat": "application/json",
+      "includes": [
+        "results/qwen2.5-7b_width-sweep.json"
+      ]
+    }
+  ],
+  "recordSet": [
+    {
+      "@type": "cr:RecordSet",
+      "@id": "bootstrap-results-records",
+      "name": "bootstrap-results-records",
+      "description": "Output of scripts/split_bootstrap_gpu.py. Resamples WikiText documents to bound probe-stability CI at the peak layer.",
+      "key": {
+        "@id": "bootstrap-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/model",
+          "name": "model",
+          "description": "Field model from bootstrap-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/peak_layer",
+          "name": "peak_layer",
+          "description": "Field peak_layer from bootstrap-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/ex_dim",
+          "name": "ex_dim",
+          "description": "Field ex_dim from bootstrap-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.ex_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/n_boot",
+          "name": "n_boot",
+          "description": "Field n_boot from bootstrap-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_boot"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/boot_rhos",
+          "name": "boot_rhos",
+          "description": "Field boot_rhos from bootstrap-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.boot_rhos"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/mean",
+          "name": "mean",
+          "description": "Field mean from bootstrap-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.mean"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/std",
+          "name": "std",
+          "description": "Field std from bootstrap-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.std"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/ci_95",
+          "name": "ci_95",
+          "description": "[low, high] 95% bootstrap CI. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.ci_95"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/design",
+          "name": "design",
+          "description": "Resampling design metadata (probe_seed, note, etc.). (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.design"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "bootstrap-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from bootstrap-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "bootstrap-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "dynamics-results-records",
+      "name": "dynamics-results-records",
+      "description": "Per-checkpoint observability trajectory for a single model across training. One JSON per model (e.g., pythia-1b_dynamics.json).",
+      "key": {
+        "@id": "dynamics-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/model",
+          "name": "model",
+          "description": "Field model from dynamics-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/experiment",
+          "name": "experiment",
+          "description": "Field experiment from dynamics-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.experiment"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/n_layers",
+          "name": "n_layers",
+          "description": "Field n_layers from dynamics-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_layers"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/hidden_dim",
+          "name": "hidden_dim",
+          "description": "Field hidden_dim from dynamics-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.hidden_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/heads",
+          "name": "heads",
+          "description": "Field heads from dynamics-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.heads"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/architecture_class",
+          "name": "architecture_class",
+          "description": "Configuration class label (e.g., '24L_16H').",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.architecture_class"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/expected_status",
+          "name": "expected_status",
+          "description": "Pre-registered expectation for this configuration.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.expected_status"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/protocol",
+          "name": "protocol",
+          "description": "Field protocol from dynamics-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.protocol"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/checkpoints",
+          "name": "checkpoints",
+          "description": "Per-checkpoint observability. Keys are 'step{N}' or numeric strings. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.checkpoints"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dynamics-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from dynamics-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "dynamics-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "legacy-results-records",
+      "name": "legacy-results-records",
+      "description": "Floor schema for historical phase-taxonomy artifacts (transformer_observe.json, *_sae-comparison.json, *_bottleneck-scaling.json, *_exdim-1000.json, *_exdim-sweep.json). These predate the v3+ scope. Required only: a well-formed provenance block. Top-level field shapes vary by phase artifact and are not constrained here.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "legacy-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from legacy-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "legacy-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "main-results-records",
+      "name": "main-results-records",
+      "description": "Single-model output of scripts/run_model.py. One JSON per model under canonical 350 ex/dim 7-seed protocol.",
+      "key": {
+        "@id": "main-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/model",
+          "name": "model",
+          "description": "Hugging Face model identifier (org/name).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/n_params_b",
+          "name": "n_params_b",
+          "description": "Field n_params_b from main-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_params_b"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/n_layers",
+          "name": "n_layers",
+          "description": "Field n_layers from main-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_layers"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/hidden_dim",
+          "name": "hidden_dim",
+          "description": "Field hidden_dim from main-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.hidden_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from main-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/protocol",
+          "name": "protocol",
+          "description": "Field protocol from main-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.protocol"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/peak_layer_final",
+          "name": "peak_layer_final",
+          "description": "Peak layer index after multi-seed evaluation (canonical).",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer_final"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/peak_layer",
+          "name": "peak_layer",
+          "description": "Peak layer index (legacy field name; equivalent to peak_layer_final).",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/peak_layer_frac",
+          "name": "peak_layer_frac",
+          "description": "Field peak_layer_frac from main-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer_frac"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/layer_profile",
+          "name": "layer_profile",
+          "description": "Per-layer pcorr; keys are stringified layer indices. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.layer_profile"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/multi_layer_eval",
+          "name": "multi_layer_eval",
+          "description": "Multi-seed evaluation at top candidate layers. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.multi_layer_eval"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/partial_corr",
+          "name": "partial_corr",
+          "description": "Confidence-controlled partial Spearman at peak layer.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.partial_corr"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/test_split_comparison",
+          "name": "test_split_comparison",
+          "description": "Field test_split_comparison from main-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.test_split_comparison"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/seed_agreement",
+          "name": "seed_agreement",
+          "description": "Field seed_agreement from main-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.seed_agreement"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/output_controlled",
+          "name": "output_controlled",
+          "description": "Output-controlled residual (rho after also controlling for trained final-layer predictor). (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.output_controlled"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/baselines",
+          "name": "baselines",
+          "description": "Hand-designed baseline pcorr values (FF goodness, activation norm, etc.). (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.baselines"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/cross_domain",
+          "name": "cross_domain",
+          "description": "Cross-domain transfer: WikiText-trained probe on WikiText test, C4 test, C4 within (C4-trained on C4-test). (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.cross_domain"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/control_sensitivity",
+          "name": "control_sensitivity",
+          "description": "Partial Spearman under different covariate sets. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.control_sensitivity"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "main-results-records/flagging_6a",
+          "name": "flagging_6a",
+          "description": "Selective-prediction flagging summary at peak layer. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "main-results"
+            },
+            "extract": {
+              "jsonPath": "$.flagging_6a"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "mechanistic-results-records",
+      "name": "mechanistic-results-records",
+      "description": "Output of scripts/mechanistic_llama.py and scripts/mechanistic_mistral.py. Mean-ablation interventions and composition tracing at the observability peak layer.",
+      "key": {
+        "@id": "mechanistic-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/model",
+          "name": "model",
+          "description": "Field model from mechanistic-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/label",
+          "name": "label",
+          "description": "Short human-readable model label.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.label"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/n_layers",
+          "name": "n_layers",
+          "description": "Field n_layers from mechanistic-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_layers"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/hidden_dim",
+          "name": "hidden_dim",
+          "description": "Field hidden_dim from mechanistic-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.hidden_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/n_params_b",
+          "name": "n_params_b",
+          "description": "Field n_params_b from mechanistic-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_params_b"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/peak_layer",
+          "name": "peak_layer",
+          "description": "Field peak_layer from mechanistic-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/n_eval",
+          "name": "n_eval",
+          "description": "Number of evaluation positions.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_eval"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/ablation_results",
+          "name": "ablation_results",
+          "description": "Per-component mean-ablation deltas. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.ablation_results"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/composition_results",
+          "name": "composition_results",
+          "description": "Composition tracing across layer ranges. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.composition_results"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/top_attn_layers",
+          "name": "top_attn_layers",
+          "description": "Field top_attn_layers from mechanistic-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.top_attn_layers"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/top_attn_depth_range",
+          "name": "top_attn_depth_range",
+          "description": "Depth-fraction range of the top attention contributors, formatted as 'low-high' (e.g. '0.00-0.54').",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.top_attn_depth_range"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/wikitext_flagging",
+          "name": "wikitext_flagging",
+          "description": "Field wikitext_flagging from mechanistic-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.wikitext_flagging"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/c4_flagging",
+          "name": "c4_flagging",
+          "description": "Field c4_flagging from mechanistic-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.c4_flagging"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/temperature_scaling",
+          "name": "temperature_scaling",
+          "description": "Field temperature_scaling from mechanistic-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.temperature_scaling"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "mechanistic-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from mechanistic-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "mechanistic-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "medqa-results-records",
+      "name": "medqa-results-records",
+      "description": "Output of scripts/rag_hallucination.py, scripts/medqa_selective.py, and scripts/truthfulqa_hallucination.py. Per-task selective-prediction and hallucination-detection summaries.",
+      "key": {
+        "@id": "medqa-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/model",
+          "name": "model",
+          "description": "Field model from medqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/task",
+          "name": "task",
+          "description": "Field task from medqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.task"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/dataset",
+          "name": "dataset",
+          "description": "Field dataset from medqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.dataset"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/peak_layer",
+          "name": "peak_layer",
+          "description": "Field peak_layer from medqa-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/n_questions",
+          "name": "n_questions",
+          "description": "Field n_questions from medqa-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_questions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/n_errors",
+          "name": "n_errors",
+          "description": "Field n_errors from medqa-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_errors"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/accuracy",
+          "name": "accuracy",
+          "description": "Field accuracy from medqa-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.accuracy"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/probe_seeds",
+          "name": "probe_seeds",
+          "description": "Field probe_seeds from medqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.probe_seeds"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/protocol",
+          "name": "protocol",
+          "description": "Field protocol from medqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.protocol"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/per_question",
+          "name": "per_question",
+          "description": "Per-question evaluation records. Length and field set vary by task; not all runs persist all questions. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.per_question"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/flag_rates",
+          "name": "flag_rates",
+          "description": "Heterogeneous map: rate-keyed buckets (e.g. '0.05', '0.1') hold object summaries; scalar metric keys (e.g. 'observer_auacc', 'confidence_auacc') hold numbers. RAG and MedQA only. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.flag_rates"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/summary",
+          "name": "summary",
+          "description": "Field summary from medqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.summary"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/quadrant",
+          "name": "quadrant",
+          "description": "TruthfulQA confident-correct/wrong/abstain quadrant counts. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.quadrant"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/standard_catches",
+          "name": "standard_catches",
+          "description": "Field standard_catches from medqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.standard_catches"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/confident_hallucination_catches",
+          "name": "confident_hallucination_catches",
+          "description": "Field confident_hallucination_catches from medqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.confident_hallucination_catches"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/confidence_threshold",
+          "name": "confidence_threshold",
+          "description": "Field confidence_threshold from medqa-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.confidence_threshold"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/grading",
+          "name": "grading",
+          "description": "Field grading from medqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.grading"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "medqa-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from medqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "medqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "nonlinear-probe-multilayer-results-records",
+      "name": "nonlinear-probe-multilayer-results-records",
+      "description": "Output of scripts/nonlinear_probe.py (and the multilayer variant). One JSON per model. Compares 2-layer MLP probe to a linear head at the peak layer.",
+      "key": {
+        "@id": "nonlinear-probe-multilayer-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/model",
+          "name": "model",
+          "description": "Field model from nonlinear-probe-multilayer-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/hidden_dim",
+          "name": "hidden_dim",
+          "description": "Field hidden_dim from nonlinear-probe-multilayer-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.hidden_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/peak_layer",
+          "name": "peak_layer",
+          "description": "Field peak_layer from nonlinear-probe-multilayer-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/ex_dim",
+          "name": "ex_dim",
+          "description": "Field ex_dim from nonlinear-probe-multilayer-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.ex_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/seeds",
+          "name": "seeds",
+          "description": "Field seeds from nonlinear-probe-multilayer-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.seeds"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/fixed_hp",
+          "name": "fixed_hp",
+          "description": "Fixed-hyperparameter probe results. per_seed is an array of per-seed records; the exact field set inside each record varies by run (linear, mlp_64, mlp_128, delta_64, ...). (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.fixed_hp"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/swept_hp",
+          "name": "swept_hp",
+          "description": "Hyperparameter-swept probe results. per_seed is an array of per-seed records (linear, best_mlp, best_config, delta, ...). (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.swept_hp"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/swept_hp_holdout",
+          "name": "swept_hp_holdout",
+          "description": "Held-out MLP-probe partial Spearman; appears in newer runs only. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.swept_hp_holdout"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/protocol",
+          "name": "protocol",
+          "description": "Field protocol from nonlinear-probe-multilayer-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.protocol"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/conclusion",
+          "name": "conclusion",
+          "description": "Free-form summary of the linear-vs-nonlinear comparison.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.conclusion"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-multilayer-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from nonlinear-probe-multilayer-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-multilayer-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "nonlinear-probe-results-records",
+      "name": "nonlinear-probe-results-records",
+      "description": "Output of scripts/nonlinear_probe.py (and the multilayer variant). One JSON per model. Compares 2-layer MLP probe to a linear head at the peak layer.",
+      "key": {
+        "@id": "nonlinear-probe-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/model",
+          "name": "model",
+          "description": "Field model from nonlinear-probe-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/hidden_dim",
+          "name": "hidden_dim",
+          "description": "Field hidden_dim from nonlinear-probe-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.hidden_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/peak_layer",
+          "name": "peak_layer",
+          "description": "Field peak_layer from nonlinear-probe-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/ex_dim",
+          "name": "ex_dim",
+          "description": "Field ex_dim from nonlinear-probe-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.ex_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/seeds",
+          "name": "seeds",
+          "description": "Field seeds from nonlinear-probe-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.seeds"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/fixed_hp",
+          "name": "fixed_hp",
+          "description": "Fixed-hyperparameter probe results. per_seed is an array of per-seed records; the exact field set inside each record varies by run (linear, mlp_64, mlp_128, delta_64, ...). (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.fixed_hp"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/swept_hp",
+          "name": "swept_hp",
+          "description": "Hyperparameter-swept probe results. per_seed is an array of per-seed records (linear, best_mlp, best_config, delta, ...). (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.swept_hp"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/swept_hp_holdout",
+          "name": "swept_hp_holdout",
+          "description": "Held-out MLP-probe partial Spearman; appears in newer runs only. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.swept_hp_holdout"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/protocol",
+          "name": "protocol",
+          "description": "Field protocol from nonlinear-probe-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.protocol"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/conclusion",
+          "name": "conclusion",
+          "description": "Free-form summary of the linear-vs-nonlinear comparison.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.conclusion"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "nonlinear-probe-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from nonlinear-probe-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "nonlinear-probe-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "residualizer-split-results-records",
+      "name": "residualizer-split-results-records",
+      "description": "Output of scripts/run_residualizer_split.py. Tests whether the OLS residualizer overfits to the probe-training pool by fitting it on a disjoint document pool R and applying without refit to the probe-training pool T. One JSON per model.",
+      "key": {
+        "@id": "residualizer-split-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/model",
+          "name": "model",
+          "description": "Field model from residualizer-split-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/n_layers",
+          "name": "n_layers",
+          "description": "Field n_layers from residualizer-split-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_layers"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/hidden_dim",
+          "name": "hidden_dim",
+          "description": "Field hidden_dim from residualizer-split-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.hidden_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/layer",
+          "name": "layer",
+          "description": "Field layer from residualizer-split-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from residualizer-split-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/protocol",
+          "name": "protocol",
+          "description": "Field protocol from residualizer-split-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.protocol"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/residualizer_beta_main",
+          "name": "residualizer_beta_main",
+          "description": "OLS coefficients fit on T: [softmax_coef, norm_coef, intercept]. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.residualizer_beta_main"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/residualizer_beta_split",
+          "name": "residualizer_beta_split",
+          "description": "OLS coefficients fit on R: [softmax_coef, norm_coef, intercept]. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.residualizer_beta_split"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/main",
+          "name": "main",
+          "description": "Probe trained on T using residualizer fit on T (in-sample residualizer).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.main"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/split_fit",
+          "name": "split_fit",
+          "description": "Probe trained on T using residualizer fit on R (held-out residualizer).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.split_fit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "residualizer-split-results-records/delta_rho",
+          "name": "delta_rho",
+          "description": "split_fit.mean - main.mean",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "residualizer-split-results"
+            },
+            "extract": {
+              "jsonPath": "$.delta_rho"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "shuffle-control-results-records",
+      "name": "shuffle-control-results-records",
+      "description": "Output of scripts/gpt2_shuffle_test.py and scripts/pythia_1.4b_shuffle.py. Two distinct historical shapes are accepted via oneOf; floor is model + provenance.",
+      "key": {
+        "@id": "shuffle-control-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "shuffle-control-results-records/model",
+          "name": "model",
+          "description": "Field model from shuffle-control-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "shuffle-control-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "shuffle-control-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from shuffle-control-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "shuffle-control-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "squad-results-records",
+      "name": "squad-results-records",
+      "description": "Output of scripts/rag_hallucination.py, scripts/medqa_selective.py, and scripts/truthfulqa_hallucination.py. Per-task selective-prediction and hallucination-detection summaries.",
+      "key": {
+        "@id": "squad-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/model",
+          "name": "model",
+          "description": "Field model from squad-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/task",
+          "name": "task",
+          "description": "Field task from squad-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.task"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/dataset",
+          "name": "dataset",
+          "description": "Field dataset from squad-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.dataset"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/peak_layer",
+          "name": "peak_layer",
+          "description": "Field peak_layer from squad-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/n_questions",
+          "name": "n_questions",
+          "description": "Field n_questions from squad-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_questions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/n_errors",
+          "name": "n_errors",
+          "description": "Field n_errors from squad-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_errors"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/accuracy",
+          "name": "accuracy",
+          "description": "Field accuracy from squad-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.accuracy"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/probe_seeds",
+          "name": "probe_seeds",
+          "description": "Field probe_seeds from squad-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.probe_seeds"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/protocol",
+          "name": "protocol",
+          "description": "Field protocol from squad-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.protocol"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/per_question",
+          "name": "per_question",
+          "description": "Per-question evaluation records. Length and field set vary by task; not all runs persist all questions. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.per_question"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/flag_rates",
+          "name": "flag_rates",
+          "description": "Heterogeneous map: rate-keyed buckets (e.g. '0.05', '0.1') hold object summaries; scalar metric keys (e.g. 'observer_auacc', 'confidence_auacc') hold numbers. RAG and MedQA only. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.flag_rates"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/summary",
+          "name": "summary",
+          "description": "Field summary from squad-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.summary"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/quadrant",
+          "name": "quadrant",
+          "description": "TruthfulQA confident-correct/wrong/abstain quadrant counts. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.quadrant"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/standard_catches",
+          "name": "standard_catches",
+          "description": "Field standard_catches from squad-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.standard_catches"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/confident_hallucination_catches",
+          "name": "confident_hallucination_catches",
+          "description": "Field confident_hallucination_catches from squad-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.confident_hallucination_catches"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/confidence_threshold",
+          "name": "confidence_threshold",
+          "description": "Field confidence_threshold from squad-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.confidence_threshold"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/grading",
+          "name": "grading",
+          "description": "Field grading from squad-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.grading"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "squad-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from squad-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "squad-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "truthfulqa-results-records",
+      "name": "truthfulqa-results-records",
+      "description": "Output of scripts/rag_hallucination.py, scripts/medqa_selective.py, and scripts/truthfulqa_hallucination.py. Per-task selective-prediction and hallucination-detection summaries.",
+      "key": {
+        "@id": "truthfulqa-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/model",
+          "name": "model",
+          "description": "Field model from truthfulqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/task",
+          "name": "task",
+          "description": "Field task from truthfulqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.task"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/dataset",
+          "name": "dataset",
+          "description": "Field dataset from truthfulqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.dataset"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/peak_layer",
+          "name": "peak_layer",
+          "description": "Field peak_layer from truthfulqa-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/n_questions",
+          "name": "n_questions",
+          "description": "Field n_questions from truthfulqa-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_questions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/n_errors",
+          "name": "n_errors",
+          "description": "Field n_errors from truthfulqa-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_errors"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/accuracy",
+          "name": "accuracy",
+          "description": "Field accuracy from truthfulqa-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.accuracy"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/probe_seeds",
+          "name": "probe_seeds",
+          "description": "Field probe_seeds from truthfulqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.probe_seeds"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/protocol",
+          "name": "protocol",
+          "description": "Field protocol from truthfulqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.protocol"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/per_question",
+          "name": "per_question",
+          "description": "Per-question evaluation records. Length and field set vary by task; not all runs persist all questions. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.per_question"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/flag_rates",
+          "name": "flag_rates",
+          "description": "Heterogeneous map: rate-keyed buckets (e.g. '0.05', '0.1') hold object summaries; scalar metric keys (e.g. 'observer_auacc', 'confidence_auacc') hold numbers. RAG and MedQA only. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.flag_rates"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/summary",
+          "name": "summary",
+          "description": "Field summary from truthfulqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.summary"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/quadrant",
+          "name": "quadrant",
+          "description": "TruthfulQA confident-correct/wrong/abstain quadrant counts. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.quadrant"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/standard_catches",
+          "name": "standard_catches",
+          "description": "Field standard_catches from truthfulqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.standard_catches"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/confident_hallucination_catches",
+          "name": "confident_hallucination_catches",
+          "description": "Field confident_hallucination_catches from truthfulqa-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.confident_hallucination_catches"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/confidence_threshold",
+          "name": "confidence_threshold",
+          "description": "Field confidence_threshold from truthfulqa-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.confidence_threshold"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/grading",
+          "name": "grading",
+          "description": "Field grading from truthfulqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.grading"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "truthfulqa-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from truthfulqa-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "truthfulqa-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "width-sweep-results-records",
+      "name": "width-sweep-results-records",
+      "description": "Output of scripts/roc_width_sweep.py. Sweeps output-layer predictor widths to test whether mid-layer signal is absorbed by the output predictor.",
+      "key": {
+        "@id": "width-sweep-results-records/model"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/model",
+          "name": "model",
+          "description": "Field model from width-sweep-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/n_params_b",
+          "name": "n_params_b",
+          "description": "Field n_params_b from width-sweep-results.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.n_params_b"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/hidden_dim",
+          "name": "hidden_dim",
+          "description": "Field hidden_dim from width-sweep-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.hidden_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/peak_layer",
+          "name": "peak_layer",
+          "description": "Field peak_layer from width-sweep-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.peak_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/output_layer",
+          "name": "output_layer",
+          "description": "Field output_layer from width-sweep-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.output_layer"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/widths",
+          "name": "widths",
+          "description": "Field widths from width-sweep-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.widths"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/eval_seeds",
+          "name": "eval_seeds",
+          "description": "Field eval_seeds from width-sweep-results. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.eval_seeds"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/target_ex_per_dim",
+          "name": "target_ex_per_dim",
+          "description": "Field target_ex_per_dim from width-sweep-results.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.target_ex_per_dim"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/results",
+          "name": "results",
+          "description": "Per-width residual partial correlation summary. (JSON-serialized)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.results"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "width-sweep-results-records/provenance",
+          "name": "provenance",
+          "description": "Field provenance from width-sweep-results.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "width-sweep-results"
+            },
+            "extract": {
+              "jsonPath": "$.provenance"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

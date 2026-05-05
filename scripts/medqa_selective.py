@@ -10,6 +10,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -18,8 +19,15 @@ import torch
 import torch.nn.functional as F
 from scipy.integrate import trapezoid
 
-DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-TRAIN_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
+
+if not torch.cuda.is_available():
+    sys.exit(
+        "medqa_selective.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
+TRAIN_DEVICE = "cuda"
 
 if shutil.which("nvidia-smi"):
     subprocess.run(["nvidia-smi"], check=False)
@@ -40,7 +48,12 @@ def elapsed_str():
 def load_wikitext(split="test", max_docs=None):
     from datasets import load_dataset
 
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -190,7 +203,11 @@ def load_medqa(max_questions=1000):
     """Load MedQA USMLE-style 4-option multiple choice questions."""
     from datasets import load_dataset
 
-    ds = load_dataset("GBaker/MedQA-USMLE-4-options", split="test")
+    ds = load_dataset(
+        "GBaker/MedQA-USMLE-4-options",
+        split="test",
+        revision=DATASET_REVISIONS["GBaker/MedQA-USMLE-4-options"]["commit"],
+    )
     questions = []
     for row in ds:
         if len(questions) >= max_questions:
@@ -310,7 +327,7 @@ import argparse
 import datetime as _dt
 
 parser = argparse.ArgumentParser(description="MedQA selective prediction with observer probe.")
-parser.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct", help="HuggingFace model ID")
+parser.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct", help="Hugging Face model ID")
 parser.add_argument("--peak-layer", type=int, default=14, help="Peak layer index (0-indexed)")
 parser.add_argument("--ex-dim", type=int, default=350, help="Probe training examples per hidden dim")
 parser.add_argument("--max-questions", type=int, default=1000, help="MedQA questions to evaluate")
@@ -325,6 +342,19 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+# Fail-fast before model download.
+if not RESULTS_DIR.is_dir():
+    sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+manifest = RESULTS_DIR / "model_revisions.json"
+if not manifest.is_file():
+    sys.exit(f"Manifest missing: {manifest}")
+if args.model not in json.loads(manifest.read_text()).get("models", {}):
+    sys.exit(f"Model {args.model!r} not in manifest")
+ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+if not ds_manifest.is_file():
+    sys.exit(f"Dataset manifest missing: {ds_manifest}")
+DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
+
 MODEL_ID = args.model
 PEAK_LAYER = args.peak_layer
 TARGET_EX_PER_DIM = args.ex_dim
@@ -332,13 +362,51 @@ MAX_QUESTIONS = args.max_questions
 SEEDS = [int(s) for s in args.seeds.split(",")]
 DTYPE = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}[args.dtype]
 MODEL_SLUG = re.sub(r"[^A-Za-z0-9]+", "_", MODEL_ID.split("/")[-1]).strip("_").lower()
+HF_SLUG_MAP = {
+    "Qwen/Qwen2.5-7B-Instruct": "qwen2.5-7b-instruct",
+    "mistralai/Mistral-7B-Instruct-v0.3": "mistral-7b-instruct-v0.3",
+    "microsoft/Phi-3-mini-4k-instruct": "phi-3-mini",
+}
+if MODEL_ID not in HF_SLUG_MAP:
+    raise KeyError(
+        f"{MODEL_ID} not in HF_SLUG_MAP. Add an entry mapping the Hugging Face ID "
+        "to its v2-convention slug before running this script for a new model."
+    )
+HF_SLUG = HF_SLUG_MAP[MODEL_ID]
+
+
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    if p.is_absolute():
+        return p
+    base = (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+    return base / p
+
+
+def _revision_kwargs(model_id):
+    manifest = Path(__file__).resolve().parent.parent / "results" / "model_revisions.json"
+    if not manifest.exists():
+        return {}
+    commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+    return {"revision": commit} if commit else {}
+
+
+OUT_PATH = _resolve_out(args.output or f"{HF_SLUG}_medqa.json")
+OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 print(f"=== MedQA selective prediction [{elapsed_str()}] ===")
 print(f"Model: {MODEL_ID} (slug={MODEL_SLUG}), peak layer: {PEAK_LAYER}, dtype: {args.dtype}")
+print(f"Output: {OUT_PATH}")
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=args.trust_remote_code)
+_rev_kw = _revision_kwargs(MODEL_ID)
+
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=args.trust_remote_code, **_rev_kw)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 model = AutoModelForCausalLM.from_pretrained(
@@ -346,10 +414,16 @@ model = AutoModelForCausalLM.from_pretrained(
     trust_remote_code=args.trust_remote_code,
     dtype=DTYPE,
     attn_implementation=args.attn_impl,
+    **_rev_kw,
 ).to(DEVICE)
 model.eval()
 
-_model_revision = getattr(model.config, "_commit_hash", None) or "unknown"
+_model_revision = _rev_kw.get("revision") or getattr(model.config, "_commit_hash", None)
+if not _model_revision:
+    raise RuntimeError(
+        f"Could not resolve model revision for {MODEL_ID}: pin via results/model_revisions.json "
+        "or upgrade transformers (model.config._commit_hash unset)."
+    )
 
 HIDDEN_DIM = model.config.hidden_size
 MAX_TRAIN = TARGET_EX_PER_DIM * HIDDEN_DIM
@@ -481,12 +555,9 @@ output = {
     "provenance": {
         "model_revision": _model_revision,
         "script": "scripts/medqa_selective.py",
-        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(),
+        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+        "value_source": "runtime",
         "device": str(DEVICE),
-        "dtype": args.dtype,
-        "attn_impl": args.attn_impl,
-        "torch_version": torch.__version__,
-        "args": vars(args),
     },
     "protocol": {
         "target_ex_per_dim": TARGET_EX_PER_DIM,
@@ -508,17 +579,10 @@ output = {
     },
 }
 
-if args.output:
-    out_path = Path(args.output)
-else:
-    filename = f"medqa_selective_{MODEL_SLUG}_results.json"
-    out_path = Path("/workspace") / filename
-    if not out_path.parent.exists():
-        out_path = Path("results") / filename
-with open(out_path, "w") as f:
+with open(OUT_PATH, "w") as f:
     json.dump(output, f, indent=2)
 
-print(f"Saved {out_path}")
+print(f"Saved {OUT_PATH}")
 print(f"Accuracy: {accuracy:.3f}, errors: {n_errors}")
 for rate in [0.05, 0.1, 0.2]:
     cr = catch_results[str(rate)]

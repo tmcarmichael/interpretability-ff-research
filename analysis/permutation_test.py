@@ -13,7 +13,7 @@ from math import factorial
 
 import numpy as np
 
-from analysis.load_results import load_all_models, load_model_means
+from analysis.load_results import SCOPES, load_all_models, load_model_means
 
 
 def family_f_stat(
@@ -77,6 +77,7 @@ def run_permutation_test(
     mc_threshold: int = 100000,
     mc_n: int = 50000,
     seed: int = 42,
+    scope: str | None = "cross_family_14",
 ) -> None:
     """Run the family-effect permutation test and print a summary.
 
@@ -89,16 +90,19 @@ def run_permutation_test(
             this count; otherwise enumerate exactly.
         mc_n: Monte Carlo sample size when above threshold.
         seed: RNG seed for Monte Carlo sampling.
+        scope: named model scope from `SCOPES` (default 'cross_family_14'
+            reproduces the paper's Section 5 cross-family test). Use
+            'all' to include every loaded model.
     """
     rng = np.random.RandomState(seed)
 
-    models = load_model_means()
+    models = load_model_means(scope=scope)
     if len(models) < 3:
         print(f"Only {len(models)} models.")
         sys.exit(1)
 
-    print(f"Loaded {len(models)} models")
-    load_all_models(verbose=True)
+    print(f"Loaded {len(models)} models (scope={scope})")
+    load_all_models(verbose=True, scope=scope)
     print()
 
     families = [m[0] for m in models]
@@ -152,4 +156,16 @@ def run_permutation_test(
 
 
 if __name__ == "__main__":
-    run_permutation_test()
+    import argparse
+
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--scope",
+        default="cross_family_14",
+        choices=sorted(SCOPES),
+        help="Named model scope (default: %(default)s, reproduces paper Section 5).",
+    )
+    p.add_argument("--seed", type=int, default=42, help="RNG seed for Monte Carlo sampling.")
+    p.add_argument("--mc-n", type=int, default=50000, help="Monte Carlo sample size.")
+    args = p.parse_args()
+    run_permutation_test(mc_n=args.mc_n, seed=args.seed, scope=args.scope)

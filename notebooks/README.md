@@ -1,22 +1,21 @@
 # Notebooks
 
-_Updated 2026-04-26 for repo v3.3.0._
+_Updated 2026-05-01 for repo v4.0.0._
 
-These notebooks ran the GPU experiments and wrote the committed JSONs in `results/`. To reproduce the results, read the JSONs directly; re-execution is not required. The committed JSONs are the source of truth.
+These notebooks are archived from the historical production pipeline. Current results are produced by `scripts/run_model.py` and validated under v4.0.0 canonical provenance; the notebooks no longer feed the chain. To reproduce a paper number, read the relevant JSON in `results/` directly. Cell outputs are not committed because they depend on the runtime environment.
 
 | Notebook | Model | What it does |
 |---|---|---|
 | `walkthrough_analysis` | (CPU-only) | Analysis pipeline walkthrough: cross-family table, permutation test, partial correlation, Pythia collapse |
 
-| `qwen05b_base_instruct_v3` | Qwen 0.5B base+instruct | v3 protocol at 600 ex/dim, full battery |
-| `qwen3b_base_instruct_v3` | Qwen 3B base+instruct | v3 protocol, adds control sensitivity |
+| `qwen05b_base_instruct_v3` | Qwen 0.5B base+instruct | Canonical 7-seed protocol at 600 ex/dim, full battery |
+| `qwen3b_base_instruct_v3` | Qwen 3B base+instruct | Canonical 7-seed protocol, adds control sensitivity |
 | `qwen7b_base_instruct_v2` | Qwen 7B base+instruct | Back-to-back run, two JSONs |
 | `qwen7b_mechanistic` | Qwen 7B | Mean-ablation patching, C4 flagging, temperature scaling |
 | `qwen7b_selective_prediction3` | Qwen 7B Instruct | TriviaQA selective prediction + instruct mechanistic |
 | `qwen14b_comprehensive_v4` | Qwen 14B | Val-seed protocol, dense layer sweep L16-40 |
 | `qwen14b_hardening` | Qwen 14B | 20-seed statistical hardening |
 | `qwen14b_instruct` | Qwen 14B Instruct | RLHF invariance at 14B |
-| `qwen05b_auxiliary_loss` | Qwen 0.5B | Auxiliary observability loss sweep |
 | `llama3b_comprehensive_v2` | Llama 3.2 3B | Cross-family divergence validation, 7-seed |
 | `cross_domain_qwen` | Qwen 1.5B | WikiText to C4/code transfer |
 | `colab_nonlinear_probe_llama3b` | Llama 3.2 3B | Linear vs MLP probe comparison, held-out HP selection |

@@ -18,6 +18,7 @@ else:
 
 import gc
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -28,11 +29,43 @@ from datasets import load_dataset
 from scipy.stats import pearsonr, rankdata
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-TRAIN_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
+
+if not torch.cuda.is_available():
+    sys.exit(
+        "roc_width_sweep.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
+TRAIN_DEVICE = "cuda"
 BATCH_SIZE = 48
 SM_CHUNK = 8
 print(f"Device: {DEVICE}")
+
+
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    if p.is_absolute():
+        return p
+    base = (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+    return base / p
+
+
+def _revision_kwargs(model_id):
+    manifest = Path(__file__).resolve().parent.parent / "results" / "model_revisions.json"
+    if not manifest.exists():
+        return {}
+    commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+    return {"revision": commit} if commit else {}
+
+
+OUT_PATH = _resolve_out("qwen2.5-7b_width-sweep.json")
+OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+print(f"Output: {OUT_PATH}")
 
 RUN_START = time.time()
 
@@ -48,7 +81,12 @@ def elapsed_str():
 
 
 def load_wikitext(split="test", max_docs=None):
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -248,16 +286,36 @@ WIDTHS = [64, 128, 256, 512]
 EVAL_SEEDS = [43, 44, 45]
 TARGET_EX_PER_DIM = 350
 
+# Fail-fast before model download.
+if not RESULTS_DIR.is_dir():
+    sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+manifest = RESULTS_DIR / "model_revisions.json"
+if not manifest.is_file():
+    sys.exit(f"Manifest missing: {manifest}")
+if MODEL_ID not in json.loads(manifest.read_text()).get("models", {}):
+    sys.exit(f"Model {MODEL_ID!r} not in manifest")
+ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+if not ds_manifest.is_file():
+    sys.exit(f"Dataset manifest missing: {ds_manifest}")
+DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
+
 print(f"=== r_OC width sweep: {MODEL_ID}, L{PEAK_LAYER}, widths={WIDTHS} ===")
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+_rev_kw = _revision_kwargs(MODEL_ID)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True, **_rev_kw)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 model = AutoModelForCausalLM.from_pretrained(
-    MODEL_ID, trust_remote_code=True, dtype=torch.bfloat16, attn_implementation="sdpa"
+    MODEL_ID, trust_remote_code=True, dtype=torch.bfloat16, attn_implementation="sdpa", **_rev_kw
 ).to(DEVICE)
 model.eval()
 
+_resolved_revision = _rev_kw.get("revision") or getattr(model.config, "_commit_hash", None)
+if not _resolved_revision:
+    raise RuntimeError(
+        f"Could not resolve model revision for {MODEL_ID}: pin via results/model_revisions.json "
+        "or upgrade transformers (model.config._commit_hash unset)."
+    )
 N_LAYERS = model.config.num_hidden_layers
 HIDDEN_DIM = model.config.hidden_size
 n_params = sum(p.numel() for p in model.parameters()) / 1e9
@@ -356,6 +414,8 @@ print(
 )
 
 # --- Save ---
+import datetime as _dt
+
 output = {
     "model": MODEL_ID,
     "n_params_b": round(n_params, 2),
@@ -366,13 +426,16 @@ output = {
     "eval_seeds": EVAL_SEEDS,
     "widths": WIDTHS,
     "results": results,
+    "provenance": {
+        "model_revision": _resolved_revision,
+        "script": "scripts/roc_width_sweep.py",
+        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+        "value_source": "runtime",
+        "device": str(DEVICE),
+    },
 }
-_out_dir = (
-    Path("/workspace") if Path("/workspace").exists() else Path(__file__).resolve().parent.parent / "results"
-)
-out_path = _out_dir / "roc_width_sweep_results.json"
-with open(out_path, "w") as f:
+with open(OUT_PATH, "w") as f:
     json.dump(output, f, indent=2)
-print(f"\nSaved {out_path}")
+print(f"\nSaved {OUT_PATH}")
 print(f"Total time: {elapsed_str()}")
 print(json.dumps(output, indent=2))

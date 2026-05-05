@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/mechanistic.schema.json",
+  "title": "Mechanistic ablation result",
+  "description": "Output of scripts/mechanistic_llama.py and scripts/mechanistic_mistral.py. Mean-ablation interventions and composition tracing at the observability peak layer.",
+  "type": "object",
+  "required": [
+    "model",
+    "n_layers",
+    "hidden_dim",
+    "n_params_b",
+    "peak_layer",
+    "n_eval",
+    "ablation_results",
+    "composition_results",
+    "top_attn_layers",
+    "top_attn_depth_range",
+    "provenance"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "model": {"type": "string"},
+    "label": {"type": "string", "description": "Short human-readable model label."},
+    "n_layers": {"type": "integer", "minimum": 1},
+    "hidden_dim": {"type": "integer", "minimum": 1},
+    "n_params_b": {"type": "number", "minimum": 0},
+    "peak_layer": {"type": "integer", "minimum": 0},
+    "n_eval": {"type": "integer", "minimum": 1, "description": "Number of evaluation positions."},
+    "ablation_results": {
+      "type": "object",
+      "description": "Per-component mean-ablation deltas.",
+      "additionalProperties": true
+    },
+    "composition_results": {
+      "type": "object",
+      "description": "Composition tracing across layer ranges.",
+      "additionalProperties": true
+    },
+    "top_attn_layers": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+    "top_attn_depth_range": {
+      "type": "string",
+      "description": "Depth-fraction range of the top attention contributors, formatted as 'low-high' (e.g. '0.00-0.54').",
+      "pattern": "^[0-9]\\.[0-9]+-[0-9]\\.[0-9]+$"
+    },
+    "wikitext_flagging": {"type": "object", "additionalProperties": true},
+    "c4_flagging": {"type": "object", "additionalProperties": true},
+    "temperature_scaling": {"type": "object", "additionalProperties": true},
+    "provenance": {"$ref": "#/$defs/provenance"}
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "script": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value_source": {"type": "string", "enum": ["runtime", "post_hoc_deterministic"]},
+        "device": {"type": "string", "enum": ["cuda", "mps", "cpu"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

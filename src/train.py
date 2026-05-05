@@ -622,7 +622,7 @@ def main():
 
     if a.device == "auto":
         a.device = (
-            "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+            "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
         )
     if a.device == "cuda":
         torch.set_float32_matmul_precision("high")

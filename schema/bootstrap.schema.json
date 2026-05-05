@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/bootstrap.schema.json",
+  "title": "Document-level bootstrap CI",
+  "description": "Output of scripts/split_bootstrap_gpu.py. Resamples WikiText documents to bound probe-stability CI at the peak layer.",
+  "type": "object",
+  "required": [
+    "model",
+    "peak_layer",
+    "ex_dim",
+    "n_boot",
+    "boot_rhos",
+    "mean",
+    "std",
+    "ci_95",
+    "design",
+    "provenance"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "model": {"type": "string"},
+    "peak_layer": {"type": "integer", "minimum": 0},
+    "ex_dim": {"type": "integer", "minimum": 1},
+    "n_boot": {"type": "integer", "minimum": 1},
+    "boot_rhos": {"type": "array", "items": {"type": "number"}, "minItems": 1},
+    "mean": {"type": "number"},
+    "std": {"type": "number", "minimum": 0},
+    "ci_95": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "[low, high] 95% bootstrap CI."
+    },
+    "design": {
+      "type": "object",
+      "description": "Resampling design metadata (probe_seed, note, etc.).",
+      "additionalProperties": true
+    },
+    "provenance": {"$ref": "#/$defs/provenance"}
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "script": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value_source": {"type": "string", "enum": ["runtime", "post_hoc_deterministic"]},
+        "device": {"type": "string", "enum": ["cuda", "mps", "cpu"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

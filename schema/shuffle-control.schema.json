@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/shuffle-control.schema.json",
+  "title": "Shuffle-permutation null control",
+  "description": "Output of scripts/gpt2_shuffle_test.py and scripts/pythia_1.4b_shuffle.py. Two distinct historical shapes are accepted via oneOf; floor is model + provenance.",
+  "type": "object",
+  "required": ["model", "provenance"],
+  "additionalProperties": true,
+  "properties": {
+    "model": {"type": "string"},
+    "provenance": {"$ref": "#/$defs/provenance"}
+  },
+  "oneOf": [
+    {
+      "title": "Variant A (gpt-2 style, single-layer permutation list)",
+      "required": [
+        "layer",
+        "n_permutations",
+        "n_train_positions",
+        "n_test_positions",
+        "real_pcorr",
+        "shuffle_pcorrs",
+        "shuffle_mean",
+        "shuffle_std",
+        "seed_base"
+      ],
+      "properties": {
+        "layer": {"type": "integer", "minimum": 0},
+        "n_permutations": {"type": "integer", "minimum": 1},
+        "n_train_positions": {"type": "integer", "minimum": 1},
+        "n_test_positions": {"type": "integer", "minimum": 1},
+        "real_pcorr": {"type": "number"},
+        "shuffle_pcorrs": {"type": "array", "items": {"type": "number"}, "minItems": 1},
+        "shuffle_mean": {"type": "number"},
+        "shuffle_std": {"type": "number", "minimum": 0},
+        "seed_base": {"type": "integer"}
+      }
+    },
+    {
+      "title": "Variant B (pythia-1.4b style, sanity-check + ratio summary)",
+      "required": [
+        "protocol",
+        "shuffle",
+        "real_rho_reference",
+        "real_rho_sanity_check",
+        "ratio_real_over_shuffle"
+      ],
+      "properties": {
+        "protocol": {"type": "object", "additionalProperties": true},
+        "shuffle": {"type": "object", "additionalProperties": true},
+        "real_rho_reference": {"type": ["number", "object"]},
+        "real_rho_sanity_check": {"type": ["number", "object"]},
+        "ratio_real_over_shuffle": {"type": ["number", "string"]}
+      }
+    }
+  ],
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "script": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value_source": {"type": "string", "enum": ["runtime", "post_hoc_deterministic"]},
+        "device": {"type": "string", "enum": ["cuda", "mps", "cpu"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

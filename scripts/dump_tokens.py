@@ -8,7 +8,7 @@ protocol so the dumped tokens match the in-process v3 measurements.
 import argparse
 import datetime as _dt
 import gc
-import os
+import json
 import re
 import shutil
 import subprocess
@@ -20,14 +20,21 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TOKENS_DIR = REPO_ROOT / "results" / "tokens"
+RESULTS_DIR = REPO_ROOT / "results"
+TOKENS_DIR = RESULTS_DIR / "tokens"
+DATASET_REVISIONS: dict = {}
 TOKENS_DIR.mkdir(parents=True, exist_ok=True)
 
-DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-TRAIN_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+if not torch.cuda.is_available():
+    import sys
+
+    sys.exit(
+        "dump_tokens.py produces paper-quality token arrays and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
+TRAIN_DEVICE = "cuda"
 
 if shutil.which("nvidia-smi"):
     subprocess.run(["nvidia-smi"], check=False)
@@ -43,7 +50,12 @@ def elapsed_str():
 def load_wikitext(split, max_docs=None):
     from datasets import load_dataset
 
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -191,7 +203,7 @@ def score_probe(head, eval_data):
 
 def main():
     parser = argparse.ArgumentParser(description="Dump per-token arrays for held-out fit-split analysis.")
-    parser.add_argument("--model", required=True, help="HuggingFace model ID")
+    parser.add_argument("--model", required=True, help="Hugging Face model ID")
     parser.add_argument("--peak-layer", type=int, required=True, help="Probe layer (0-indexed)")
     parser.add_argument("--ex-dim", type=int, default=350, help="Train budget per hidden dim (default 350)")
     parser.add_argument(
@@ -213,6 +225,20 @@ def main():
     )
     args = parser.parse_args()
 
+    # Fail-fast before model download.
+    if not RESULTS_DIR.is_dir():
+        sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+    manifest = RESULTS_DIR / "model_revisions.json"
+    if not manifest.is_file():
+        sys.exit(f"Manifest missing: {manifest}")
+    if args.model not in json.loads(manifest.read_text()).get("models", {}):
+        sys.exit(f"Model {args.model!r} not in manifest")
+    ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+    if not ds_manifest.is_file():
+        sys.exit(f"Dataset manifest missing: {ds_manifest}")
+    global DATASET_REVISIONS
+    DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
+
     seeds = [int(s) for s in args.seeds.split(",")]
     dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}[args.dtype]
     slug = re.sub(r"[^A-Za-z0-9]+", "_", args.model.split("/")[-1]).strip("_").lower()
@@ -223,7 +249,16 @@ def main():
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=args.trust_remote_code)
+    def _revision_kwargs(model_id):
+        manifest = REPO_ROOT / "results" / "model_revisions.json"
+        if not manifest.exists():
+            return {}
+        commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+        return {"revision": commit} if commit else {}
+
+    _rev_kw = _revision_kwargs(args.model)
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=args.trust_remote_code, **_rev_kw)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
@@ -231,9 +266,15 @@ def main():
         trust_remote_code=args.trust_remote_code,
         dtype=dtype,
         attn_implementation=args.attn_impl,
+        **_rev_kw,
     ).to(DEVICE)
     model.eval()
-    _model_revision = getattr(model.config, "_commit_hash", None) or "unknown"
+    _model_revision = _rev_kw.get("revision") or getattr(model.config, "_commit_hash", None)
+    if not _model_revision:
+        raise RuntimeError(
+            f"Could not resolve model revision for {args.model}: pin via results/model_revisions.json "
+            "or upgrade transformers (model.config._commit_hash unset)."
+        )
     cfg = getattr(model.config, "text_config", model.config)
     hidden_dim = cfg.hidden_size
     n_layers = cfg.num_hidden_layers
@@ -305,7 +346,7 @@ def main():
         val_ex_per_dim=args.val_ex_dim,
         seeds=np.array(seeds, dtype=np.int32),
         model_revision=_model_revision,
-        timestamp=_dt.datetime.now(_dt.UTC).isoformat(),
+        timestamp=_dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
         device=str(DEVICE),
         dtype=args.dtype,
         attn_impl=args.attn_impl,

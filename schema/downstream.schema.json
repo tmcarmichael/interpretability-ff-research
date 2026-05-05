@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/downstream.schema.json",
+  "title": "Downstream task evaluation result",
+  "description": "Output of scripts/rag_hallucination.py, scripts/medqa_selective.py, and scripts/truthfulqa_hallucination.py. Per-task selective-prediction and hallucination-detection summaries.",
+  "type": "object",
+  "required": [
+    "model",
+    "task",
+    "dataset",
+    "peak_layer",
+    "n_questions",
+    "n_errors",
+    "accuracy",
+    "probe_seeds",
+    "protocol",
+    "per_question",
+    "provenance"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "model": {"type": "string"},
+    "task": {
+      "type": "string",
+      "enum": ["rag_hallucination", "medqa_selective_prediction", "truthfulqa_hallucination"]
+    },
+    "dataset": {"type": "string"},
+    "peak_layer": {"type": "integer", "minimum": 0},
+    "n_questions": {"type": "integer", "minimum": 1},
+    "n_errors": {"type": "integer", "minimum": 0},
+    "accuracy": {"type": "number", "minimum": 0, "maximum": 1},
+    "probe_seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 1},
+    "protocol": {"type": "object", "additionalProperties": true},
+    "per_question": {
+      "type": "array",
+      "description": "Per-question evaluation records. Length and field set vary by task; not all runs persist all questions.",
+      "items": {"type": "object", "additionalProperties": true}
+    },
+    "flag_rates": {
+      "type": "object",
+      "description": "Heterogeneous map: rate-keyed buckets (e.g. '0.05', '0.1') hold object summaries; scalar metric keys (e.g. 'observer_auacc', 'confidence_auacc') hold numbers. RAG and MedQA only.",
+      "additionalProperties": true
+    },
+    "summary": {"type": "object", "additionalProperties": true},
+    "quadrant": {
+      "type": "object",
+      "description": "TruthfulQA confident-correct/wrong/abstain quadrant counts.",
+      "additionalProperties": true
+    },
+    "standard_catches": {"type": "object", "additionalProperties": true},
+    "confident_hallucination_catches": {"type": "object", "additionalProperties": true},
+    "confidence_threshold": {"type": "number"},
+    "grading": {"type": "string"},
+    "provenance": {"$ref": "#/$defs/provenance"}
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "script": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value_source": {"type": "string", "enum": ["runtime", "post_hoc_deterministic"]},
+        "device": {"type": "string", "enum": ["cuda", "mps", "cpu"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

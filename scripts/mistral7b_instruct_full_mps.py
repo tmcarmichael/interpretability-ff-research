@@ -681,7 +681,16 @@ def main():
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+    def _revision_kwargs(model_id):
+        manifest = RESULTS_DIR / "model_revisions.json"
+        if not manifest.exists():
+            return {}
+        commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+        return {"revision": commit} if commit else {}
+
+    _rev_kw = _revision_kwargs(MODEL_ID)
+
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, **_rev_kw)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -689,7 +698,7 @@ def main():
     attn_impl = "eager" if DEVICE == "mps" else "sdpa"
     print(f"Loading model dtype={model_dtype} attn={attn_impl} ...", flush=True)
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID, dtype=model_dtype, attn_implementation=attn_impl
+        MODEL_ID, dtype=model_dtype, attn_implementation=attn_impl, **_rev_kw
     ).to(DEVICE)
     model.eval()
 
@@ -796,7 +805,6 @@ def main():
             "eval_split": "test",
             "batch_size": batch_size,
             "device": DEVICE,
-            "dtype": str(model_dtype),
             "output_controlled": "not_computed_local_memory_budget",
         },
         "sweep_results": sweep_results,

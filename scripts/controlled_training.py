@@ -1,8 +1,7 @@
 """Controlled training: MHA vs GQA at matched parameters and identical data.
 
-Trains two parameter-matched models from scratch on identical data, varying
-only the attention mechanism (MHA vs GQA). Isolates attention topology from
-data and parameter-count confounds when comparing cross-family observability.
+Trains two parameter-matched models from scratch on identical data,
+varying only the attention mechanism (MHA vs GQA).
 """
 
 import gc
@@ -21,12 +20,31 @@ from scipy.stats import pearsonr, rankdata, spearmanr
 if shutil.which("nvidia-smi"):
     subprocess.run(["nvidia-smi"], check=False)
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+if not torch.cuda.is_available():
+    import sys
+
+    sys.exit(
+        "controlled_training.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
 RUN_START = time.time()
 
-OUT_DIR = (
-    Path("/workspace") if Path("/workspace").exists() else Path(__file__).resolve().parent.parent / "results"
-)
+
+def _output_root():
+    return (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+
+
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    return p if p.is_absolute() else _output_root() / p
+
+
+OUT_DIR = _output_root()
 
 
 def elapsed_str():
@@ -95,6 +113,10 @@ parser = argparse.ArgumentParser(description="Controlled MHA vs GQA training")
 parser.add_argument("--scale", choices=["150m", "1b", "3b"], default="150m", help="Model scale preset")
 parser.add_argument("--seeds", type=int, default=1, help="Training seeds per config (1=pilot, 3=publication)")
 args = parser.parse_args()
+
+OUT_PATH = _resolve_out(f"controlled_training_{args.scale}_results.json")
+OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+print(f"Output: {OUT_PATH}")
 
 SCALE_PRESETS = {
     "150m": {
@@ -664,9 +686,8 @@ output = {
     },
 }
 
-out_path = OUT_DIR / f"controlled_training_{args.scale}_results.json"
-with open(out_path, "w") as f:
+with open(OUT_PATH, "w") as f:
     json.dump(output, f, indent=2)
 
-print(f"\nSaved {out_path}")
+print(f"\nSaved {OUT_PATH}")
 print(f"Total time: {elapsed_str()}")

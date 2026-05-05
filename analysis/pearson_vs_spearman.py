@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.stats import pearsonr
 
-from analysis.load_results import load_all_models, load_control_sensitivity
+from analysis.load_results import SCOPES, load_all_models, load_control_sensitivity
 
 
 def partial_pearson(
@@ -24,12 +24,12 @@ def partial_pearson(
     return float(r), float(p)
 
 
-def report() -> None:
+def report(scope: str | None = "control_sensitivity_14") -> None:
     """Print the Pearson-vs-Spearman delta table for all available models."""
-    load_all_models(verbose=True)
+    load_all_models(verbose=True, scope=scope)
     print()
 
-    models = load_control_sensitivity()
+    models = load_control_sensitivity(scope=scope)
     if not models:
         print("No control sensitivity data.")
         return
@@ -49,4 +49,11 @@ def report() -> None:
 
 
 if __name__ == "__main__":
-    report()
+    import argparse
+
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--scope", default="control_sensitivity_14", choices=sorted(SCOPES), help="Named model scope."
+    )
+    args = p.parse_args()
+    report(scope=args.scope)

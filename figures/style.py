@@ -48,8 +48,7 @@ PCORR_YLIM = (-0.02, 0.45)
 DETECTION_FLOOR = 0.15
 HEALTHY_FLOOR = 0.21
 
-# Shared styling for the detection-floor band. Open-coded across four
-# generators before v3.0.0 centralization; keep in sync here.
+# Shared styling for the detection-floor band.
 _DETECTION_FLOOR_FILL = {"color": "#BBBBBB", "alpha": 0.14, "zorder": 0}
 _DETECTION_FLOOR_LINE = {
     "color": "#888888",
@@ -247,7 +246,6 @@ def save_fig(fig, name: str, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     out = output_dir / name
     # Strip time-varying PDF metadata so byte-identical regeneration is possible.
-    # Enables content-diff checks (figures/generate_all.py --check).
     fig.savefig(
         out,
         bbox_inches="tight",

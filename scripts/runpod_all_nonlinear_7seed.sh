@@ -9,8 +9,6 @@
 #
 # Common flags: --seeds 42..48, --batch-size 48, --attn-impl sdpa, --ex-dim 350.
 #
-# Expected wall time on a single H100 80GB: 45-55 minutes total.
-#
 # Usage on pod:
 #   export HF_TOKEN=hf_xxx
 #   bash runpod_all_nonlinear_7seed.sh

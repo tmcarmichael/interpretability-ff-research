@@ -9,6 +9,7 @@ but elevated shuffle values would implicate the probe.
 import datetime as _dt
 import gc
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -26,11 +27,45 @@ N_PERMUTATIONS = 10
 LAYER_SELECT_SEED = 42  # not used here; kept in provenance
 PROBE_SEEDS = list(range(43, 43 + N_PERMUTATIONS))
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
-RESULTS_PATH = RESULTS_DIR / "pythia1_4b_results.json"
-_OUT_DIR = Path("/workspace") if Path("/workspace").exists() else RESULTS_DIR
-OUTPUT_PATH = _OUT_DIR / "pythia_1.4b_shuffle_results.json"
+RESULTS_PATH = RESULTS_DIR / "pythia-1.4b_main.json"  # input reference, fixed in-repo
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+# Fail-fast before model download.
+if not RESULTS_DIR.is_dir():
+    sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+manifest = RESULTS_DIR / "model_revisions.json"
+if not manifest.is_file():
+    sys.exit(f"Manifest missing: {manifest}")
+if MODEL_ID not in json.loads(manifest.read_text()).get("models", {}):
+    sys.exit(f"Model {MODEL_ID!r} not in manifest")
+ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+if not ds_manifest.is_file():
+    sys.exit(f"Dataset manifest missing: {ds_manifest}")
+DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
+
+
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    if p.is_absolute():
+        return p
+    base = (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+    return base / p
+
+
+OUTPUT_PATH = _resolve_out("pythia-1.4b_shuffle-control.json")
+OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+if not torch.cuda.is_available():
+    import sys
+
+    sys.exit(
+        "pythia_1.4b_shuffle.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
 TRAIN_DEVICE = DEVICE
 print(f"Device: {DEVICE}")
 RUN_START = time.time()
@@ -101,7 +136,13 @@ def evaluate_head(head, val_data):
 def load_wikitext(split, max_docs=None):
     from datasets import load_dataset
 
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split, streaming=bool(max_docs))
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+        streaming=bool(max_docs),
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -243,15 +284,26 @@ def main():
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+    _rev_kw = (
+        {"revision": json.loads(manifest.read_text())["models"][MODEL_ID]["commit"]}
+        if json.loads(manifest.read_text()).get("models", {}).get(MODEL_ID, {}).get("commit")
+        else {}
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, **_rev_kw)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID, dtype=torch.bfloat16, attn_implementation="sdpa"
+        MODEL_ID, dtype=torch.bfloat16, attn_implementation="sdpa", **_rev_kw
     ).to(DEVICE)
     model.eval()
     layer_modules = _get_layer_list(model)
-    _model_revision = getattr(model.config, "_commit_hash", None) or "unknown"
+    _model_revision = _rev_kw.get("revision") or getattr(model.config, "_commit_hash", None)
+    if not _model_revision:
+        raise RuntimeError(
+            f"Could not resolve model revision for {MODEL_ID}: pin via results/model_revisions.json "
+            "or upgrade transformers (model.config._commit_hash unset)."
+        )
     print(f"Model loaded [{elapsed_str()}]")
 
     # Tokenize
@@ -314,16 +366,9 @@ def main():
         "provenance": {
             "model_revision": _model_revision,
             "script": "scripts/pythia_1.4b_shuffle.py",
-            "timestamp": _dt.datetime.now(_dt.UTC).isoformat(),
+            "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+            "value_source": "runtime",
             "device": str(DEVICE),
-            "torch_version": torch.__version__,
-            "output_file": str(OUTPUT_PATH.name),
-            "note": (
-                "Shuffle test on Pythia 1.4B peak layer. N permutations of the "
-                "binary target; probes trained on permuted targets and evaluated "
-                "against real val target. Confirms the (24L, 16H) collapse is a "
-                "real signal drop, not a probe-failure artifact."
-            ),
         },
         "protocol": {
             "layer": PEAK,

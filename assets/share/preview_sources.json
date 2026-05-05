@@ -1,0 +1,34 @@
+{
+  "checkpoint_dynamics.png": {
+    "source_pdf": "checkpoint_dynamics.pdf",
+    "source_sha256": "5fb8930796d3d8427cb7943a810a336aafa8d6e6ac41dbba0b7afe55cce4f8c8"
+  },
+  "control_sensitivity_waterfall.png": {
+    "source_pdf": "control_sensitivity_waterfall.pdf",
+    "source_sha256": "0d02af3f8a4b2f0be16381faece9c5e57ea148b88ab958d47eb3c800fec9762b"
+  },
+  "cross_family_scaling.png": {
+    "source_pdf": "cross_family_scaling.pdf",
+    "source_sha256": "ff23e5b8ce8f8a9c1376d3c27496e1e71de8304f608a7d77a65aa6b6c9c2a4bb"
+  },
+  "downstream_three_model.png": {
+    "source_pdf": "downstream_three_model.pdf",
+    "source_sha256": "a6a2b8293834045dce1a276331f7eca45979b7d3f90c4010845d1621a735ba4f"
+  },
+  "exdim_sensitivity.png": {
+    "source_pdf": "exdim_sensitivity.pdf",
+    "source_sha256": "136152df1d6dd155e8a7a932e55d03116fda9340116a4ded97dd8802c9ab7dd4"
+  },
+  "oc_vs_pcorr.png": {
+    "source_pdf": "oc_vs_pcorr.pdf",
+    "source_sha256": "c1fe01a2a2b6d8176c21e09bf63e3e6de01b887586cb4dbbd1499049a4f21c2c"
+  },
+  "pythia_layers.png": {
+    "source_pdf": "pythia_layers.pdf",
+    "source_sha256": "96510f571e670e45ff3537d7d7efc9960e62df3c4e9a698ffb10dcc8d53d0b26"
+  },
+  "within_family_cliff.png": {
+    "source_pdf": "within_family_cliff.pdf",
+    "source_sha256": "0e0e55c019f9fc87f972b3a9391cfac74160a16896b9aad1ef3b527bf0123189"
+  }
+}

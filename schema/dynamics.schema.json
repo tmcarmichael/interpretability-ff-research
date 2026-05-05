@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/dynamics.schema.json",
+  "title": "Checkpoint dynamics result",
+  "description": "Per-checkpoint observability trajectory for a single model across training. One JSON per model (e.g., pythia-1b_dynamics.json).",
+  "type": "object",
+  "required": [
+    "model",
+    "n_layers",
+    "hidden_dim",
+    "checkpoints",
+    "provenance"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "model": {"type": "string"},
+    "experiment": {"type": "string"},
+    "n_layers": {"type": "integer", "minimum": 1},
+    "hidden_dim": {"type": "integer", "minimum": 1},
+    "heads": {"type": "integer", "minimum": 1},
+    "architecture_class": {
+      "type": "string",
+      "description": "Configuration class label (e.g., '24L_16H')."
+    },
+    "expected_status": {
+      "type": "string",
+      "enum": ["healthy", "collapsed"],
+      "description": "Pre-registered expectation for this configuration."
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "layer_select_seed": {"type": "integer"},
+        "target_ex_per_dim": {"type": "integer"},
+        "batch_size": {"type": "integer"}
+      }
+    },
+    "checkpoints": {
+      "type": "object",
+      "description": "Per-checkpoint observability. Keys are 'step{N}' or numeric strings.",
+      "additionalProperties": {
+        "$ref": "#/$defs/checkpoint"
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {"type": "string"},
+        "script": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value_source": {"type": "string", "enum": ["runtime", "post_hoc_deterministic"]},
+        "device": {"type": "string", "enum": ["cuda", "mps", "cpu"]}
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "checkpoint": {
+      "type": "object",
+      "required": ["step", "tokens_seen", "partial_corr"],
+      "properties": {
+        "step": {"type": "integer", "minimum": 0},
+        "tokens_seen": {"type": ["integer", "number"], "minimum": 0},
+        "revision": {
+          "type": "string",
+          "description": "Hugging Face commit SHA pinning this checkpoint."
+        },
+        "layer_profile": {
+          "type": "object",
+          "patternProperties": {"^[0-9]+$": {"type": "number"}}
+        },
+        "peak_layer": {"type": "integer", "minimum": 0},
+        "peak_layer_frac": {"type": "number", "minimum": 0, "maximum": 1},
+        "partial_corr": {
+          "type": "object",
+          "required": ["mean"],
+          "properties": {
+            "mean": {"type": "number"},
+            "std": {"type": "number", "minimum": 0},
+            "per_seed": {"type": "array", "items": {"type": "number"}}
+          }
+        },
+        "output_controlled": {
+          "type": "object",
+          "properties": {
+            "mean": {"type": "number"},
+            "per_seed": {"type": "array", "items": {"type": "number"}}
+          }
+        },
+        "seed_agreement": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "object", "properties": {"mean": {"type": "number"}}}
+          ]
+        },
+        "perplexity": {"type": ["number", "null"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

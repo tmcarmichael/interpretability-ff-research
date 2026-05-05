@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/width-sweep.schema.json",
+  "title": "Output-controlled width sweep",
+  "description": "Output of scripts/roc_width_sweep.py. Sweeps output-layer predictor widths to test whether mid-layer signal is absorbed by the output predictor.",
+  "type": "object",
+  "required": [
+    "model",
+    "n_params_b",
+    "hidden_dim",
+    "peak_layer",
+    "output_layer",
+    "widths",
+    "eval_seeds",
+    "target_ex_per_dim",
+    "results",
+    "provenance"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "model": {"type": "string"},
+    "n_params_b": {"type": "number", "minimum": 0},
+    "hidden_dim": {"type": "integer", "minimum": 1},
+    "peak_layer": {"type": "integer", "minimum": 0},
+    "output_layer": {"type": "integer", "minimum": 0},
+    "widths": {"type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 1},
+    "eval_seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 1},
+    "target_ex_per_dim": {"type": "integer", "minimum": 1},
+    "results": {
+      "type": "object",
+      "description": "Per-width residual partial correlation summary.",
+      "additionalProperties": true
+    },
+    "provenance": {"$ref": "#/$defs/provenance"}
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "script": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value_source": {"type": "string", "enum": ["runtime", "post_hoc_deterministic"]},
+        "device": {"type": "string", "enum": ["cuda", "mps", "cpu"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

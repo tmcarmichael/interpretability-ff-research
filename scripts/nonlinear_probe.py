@@ -9,7 +9,11 @@ import argparse
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
+DATASET_REVISIONS: dict = {}
 
 if shutil.which("nvidia-smi"):
     subprocess.run(["nvidia-smi"], check=False)
@@ -42,7 +46,12 @@ def compute_loss_residuals(losses, max_softmax, activation_norm):
 
 
 def load_wikitext(split="test", max_docs=None):
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -135,7 +144,14 @@ def collect_layer_data(model, tokenizer, docs, layer, device, max_tokens, max_le
     }
 
 
-TRAIN_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+if not torch.cuda.is_available():
+    import sys
+
+    sys.exit(
+        "nonlinear_probe.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+TRAIN_DEVICE = "cuda"
 
 
 def train_linear(acts, targets, seed=42, epochs=20, lr=1e-3):
@@ -202,7 +218,7 @@ def train_mlp_best(acts, targets, val_acts, val_losses, val_covs, seed=42, hidde
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", required=True, help="HuggingFace model ID")
+    parser.add_argument("--model", required=True, help="Hugging Face model ID")
     parser.add_argument(
         "--peak-layer", type=int, default=None, help="Layer to probe (default: auto-detect from results)"
     )
@@ -228,21 +244,62 @@ def main():
     )
     args = parser.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    # Fail-fast before model download.
+    if not RESULTS_DIR.is_dir():
+        sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+    manifest = RESULTS_DIR / "model_revisions.json"
+    if not manifest.is_file():
+        sys.exit(f"Manifest missing: {manifest}")
+    if args.model not in json.loads(manifest.read_text()).get("models", {}):
+        sys.exit(f"Model {args.model!r} not in manifest")
+    ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+    if not ds_manifest.is_file():
+        sys.exit(f"Dataset manifest missing: {ds_manifest}")
+    global DATASET_REVISIONS
+    DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
+
+    def _resolve_out(name_or_path):
+        p = Path(name_or_path)
+        if p.is_absolute():
+            return p
+        base = (
+            Path("/workspace")
+            if Path("/workspace").exists()
+            else Path(__file__).resolve().parent.parent / "results"
+        )
+        return base / p
+
+    output_name = args.output or f"nonlinear_probe_{args.model.split('/')[-1]}.json"
+    out_path = _resolve_out(output_name)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    device = "cuda"
     print(f"Device: {device}")
+    print(f"Output: {out_path}")
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
+    def _revision_kwargs(model_id):
+        commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+        return {"revision": commit} if commit else {}
+
+    _rev_kw = _revision_kwargs(args.model)
+
     print(f"Loading {args.model}...")
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=args.trust_remote_code)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=args.trust_remote_code, **_rev_kw)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    load_kwargs = {"dtype": torch.bfloat16, "attn_implementation": args.attn_impl}
+    load_kwargs = {"dtype": torch.bfloat16, "attn_implementation": args.attn_impl, **_rev_kw}
     if args.trust_remote_code:
         load_kwargs["trust_remote_code"] = True
     model = AutoModelForCausalLM.from_pretrained(args.model, **load_kwargs).to(device)
     model.eval()
-    _model_revision = getattr(model.config, "_commit_hash", None) or "unknown"
+    _model_revision = _rev_kw.get("revision") or getattr(model.config, "_commit_hash", None)
+    if not _model_revision:
+        raise RuntimeError(
+            f"Could not resolve model revision for {args.model}: pin via results/model_revisions.json "
+            "or upgrade transformers (model.config._commit_hash unset)."
+        )
 
     hidden_dim = model.config.hidden_size
     n_layers = model.config.num_hidden_layers
@@ -456,8 +513,6 @@ def main():
     # Save results
     import datetime as _dt
 
-    output_name = args.output or f"nonlinear_probe_{args.model.split('/')[-1]}.json"
-
     out = {
         "model": args.model,
         "peak_layer": peak,
@@ -467,17 +522,15 @@ def main():
         "provenance": {
             "model_revision": _model_revision,
             "script": "scripts/nonlinear_probe.py",
-            "timestamp": _dt.datetime.now(_dt.UTC).isoformat(),
+            "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+            "value_source": "runtime",
             "device": str(device),
-            "torch_version": torch.__version__,
-            "output_file": output_name,
         },
         "protocol": {
             "peak_layer": peak,
             "ex_dim": args.ex_dim,
             "seeds": args.seeds,
             "batch_size": args.batch_size,
-            "attn_impl": args.attn_impl,
         },
         "fixed_hp": {
             "per_seed": per_seed,
@@ -501,11 +554,6 @@ def main():
         "conclusion": "linear_sufficient" if abs(delta_holdout) < 0.02 else "nonlinear_advantage",
     }
 
-    if Path("/workspace").exists():
-        out_path = Path(f"/workspace/{output_name}")
-    else:
-        out_path = Path(__file__).resolve().parent.parent / "results" / output_name
-        out_path.parent.mkdir(exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(out, f, indent=2)
     print(f"Saved {out_path}")

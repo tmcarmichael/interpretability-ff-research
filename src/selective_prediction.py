@@ -346,9 +346,14 @@ def main():
     a = P.parse_args()
 
     if a.device == "auto":
-        a.device = (
-            "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
-        )
+        if not torch.cuda.is_available():
+            import sys
+
+            sys.exit(
+                "selective_prediction.py auto-device requires CUDA. "
+                "Pass --device cpu or --device mps explicitly for local dev."
+            )
+        a.device = "cuda"
 
     seeds = list(range(42, 42 + a.seeds))
 
@@ -368,9 +373,7 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     dtype = torch.float16 if a.device in ("mps", "cuda") else torch.float32
-    model = AutoModelForCausalLM.from_pretrained(a.model, trust_remote_code=True, torch_dtype=dtype).to(
-        a.device
-    )
+    model = AutoModelForCausalLM.from_pretrained(a.model, trust_remote_code=True, dtype=dtype).to(a.device)
     model.eval()
 
     n_layers = model.config.num_hidden_layers

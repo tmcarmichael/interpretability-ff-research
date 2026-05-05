@@ -1,0 +1,30 @@
+{
+  "model": "openai-community/gpt2",
+  "layer": 11,
+  "n_permutations": 10,
+  "seed_base": 100,
+  "real_pcorr": 0.29182514861722614,
+  "shuffle_pcorrs": [
+    0.046175633647506875,
+    0.018498231273198384,
+    0.03948073402544531,
+    0.01535024929467508,
+    -0.015567250608619373,
+    0.005654036876389778,
+    -0.00645753710865073,
+    -0.003501020515370139,
+    0.016857832903435146,
+    0.021103213743679725
+  ],
+  "shuffle_mean": 0.013759412353169003,
+  "shuffle_std": 0.018529205184567646,
+  "n_train_positions": 200000,
+  "n_test_positions": 50000,
+  "provenance": {
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "script": "scripts/gpt2_shuffle_test.py",
+    "timestamp": "2026-05-01T16:13:59+00:00",
+    "value_source": "runtime",
+    "device": "cuda"
+  }
+}

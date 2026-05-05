@@ -1,4 +1,4 @@
-"""Backfill the later probe phases for Pythia 12B from a saved checkpoint.
+"""Backfill the later probe steps for Pythia 12B from a saved checkpoint.
 
 Reads the peak layer from the existing checkpoint, recollects only the
 peak and output layer activations, and merges the results JSON to match
@@ -8,6 +8,7 @@ the schema produced by run_model.py.
 import datetime as _dt
 import gc
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -16,20 +17,58 @@ import torch
 import torch.nn.functional as F
 from scipy.stats import pearsonr, rankdata, spearmanr
 
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
+
 # ── Config ───────────────────────────────────────────────────────────
 
 MODEL_ID = "EleutherAI/pythia-12b"
+
+# Fail-fast before model download.
+if not RESULTS_DIR.is_dir():
+    sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+manifest = RESULTS_DIR / "model_revisions.json"
+if not manifest.is_file():
+    sys.exit(f"Manifest missing: {manifest}")
+if MODEL_ID not in json.loads(manifest.read_text()).get("models", {}):
+    sys.exit(f"Model {MODEL_ID!r} not in manifest")
+ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+if not ds_manifest.is_file():
+    sys.exit(f"Dataset manifest missing: {ds_manifest}")
+DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
 BATCH_SIZE = 24
 EX_DIM = 350
 EVAL_SEEDS = list(range(43, 50))  # 7 seeds; match run_model.py default
 LAYER_SELECT_SEED = 42
-_OUT_DIR = (
-    Path("/workspace") if Path("/workspace").exists() else Path(__file__).resolve().parent.parent / "results"
-)
-CHECKPOINT_PATH = _OUT_DIR / "pythia_12b_checkpoint.json"
-OUTPUT_PATH = _OUT_DIR / "pythia_12b_results.json"
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    if p.is_absolute():
+        return p
+    base = (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+    return base / p
+
+
+OUTPUT_PATH = _resolve_out("pythia-12b_main.json")
+# Match run_model.py's checkpoint naming: <output_slug>_checkpoint.json,
+# where output_slug strips _results.json or .json from the output filename.
+_output_slug = OUTPUT_PATH.name.replace("_results.json", "").replace(".json", "")
+CHECKPOINT_PATH = _resolve_out(f"{_output_slug}_checkpoint.json")
+OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+CHECKPOINT_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+if not torch.cuda.is_available():
+    import sys
+
+    sys.exit(
+        "pythia_12b_backfill.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
 TRAIN_DEVICE = DEVICE
 print(f"Device: {DEVICE}")
 RUN_START = time.time()
@@ -114,7 +153,13 @@ def compute_hand_designed(data):
 def load_wikitext(split="test", max_docs=None):
     from datasets import load_dataset
 
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split, streaming=bool(max_docs))
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+        streaming=bool(max_docs),
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -276,15 +321,26 @@ def main():
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+    _rev_kw = (
+        {"revision": json.loads(manifest.read_text())["models"][MODEL_ID]["commit"]}
+        if json.loads(manifest.read_text()).get("models", {}).get(MODEL_ID, {}).get("commit")
+        else {}
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, **_rev_kw)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID, dtype=torch.bfloat16, attn_implementation="sdpa"
+        MODEL_ID, dtype=torch.bfloat16, attn_implementation="sdpa", **_rev_kw
     ).to(DEVICE)
     model.eval()
     layer_modules = _get_layer_list(model)
-    _model_revision = getattr(model.config, "_commit_hash", None) or "unknown"
+    _model_revision = _rev_kw.get("revision") or getattr(model.config, "_commit_hash", None)
+    if not _model_revision:
+        raise RuntimeError(
+            f"Could not resolve model revision for {MODEL_ID}: pin via results/model_revisions.json "
+            "or upgrade transformers (model.config._commit_hash unset)."
+        )
     n_params = sum(p.numel() for p in model.parameters()) / 1e9
     print(f"Model loaded: {n_params:.2f}B params [{elapsed_str()}]")
 
@@ -329,7 +385,13 @@ def main():
     from datasets import load_dataset
 
     c4_test_docs = []
-    ds = load_dataset("allenai/c4", "en", split="validation", streaming=True)
+    ds = load_dataset(
+        "allenai/c4",
+        "en",
+        split="validation",
+        revision=DATASET_REVISIONS["allenai/c4"]["commit"],
+        streaming=True,
+    )
     for i, row in enumerate(ds):
         if i < 50000:
             continue
@@ -343,7 +405,13 @@ def main():
     del c4_test_docs, c4_test_enc
 
     c4_train_docs = []
-    ds2 = load_dataset("allenai/c4", "en", split="validation", streaming=True)
+    ds2 = load_dataset(
+        "allenai/c4",
+        "en",
+        split="validation",
+        revision=DATASET_REVISIONS["allenai/c4"]["commit"],
+        streaming=True,
+    )
     for row in ds2:
         text = row["text"].strip()
         if len(text) > 100:
@@ -600,16 +668,9 @@ def main():
         "provenance": {
             "model_revision": _model_revision,
             "script": "scripts/pythia_12b_backfill.py",
-            "timestamp": _dt.datetime.now(_dt.UTC).isoformat(),
+            "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+            "value_source": "runtime",
             "device": str(DEVICE),
-            "torch_version": torch.__version__,
-            "output_file": str(OUTPUT_PATH.name),
-            "note": (
-                "Phase 1-3 (layer_profile, multi_layer_eval, partial_corr, seed_agreement) "
-                "reproduced from pythia_12b_checkpoint.json (run_model.py, batch_size=24, "
-                "bf16 forward, use_cache=False). Phase 4-5 plus C4 cross-domain collected "
-                "by this backfill script with bf16 CPU activation storage to fit pod memory."
-            ),
         },
         "protocol": {
             "layer_select_seed": LAYER_SELECT_SEED,

@@ -30,13 +30,24 @@ jobs:
         run: uv sync
 
       - name: Ruff check
-        run: uv run ruff check src/ scripts/ figures/ analysis/
+        run: uv run ruff check src/ scripts/ analysis/ tests/
 
       - name: Ruff format check
-        run: uv run ruff format --check src/ scripts/ figures/ analysis/
+        run: uv run ruff format --check src/ scripts/ analysis/ tests/
 
       - name: Vulture dead code check
-        run: uv run vulture src/ analysis/ figures/ scripts/vulture_whitelist.py --min-confidence 90
+        run: uv run vulture src/ scripts/ analysis/ scripts/vulture_whitelist.py --min-confidence 90
+
+      - name: Path-bug pattern check (f-string /workspace/ interpolation)
+        run: |
+          matches=$(grep -n -e 'f"/workspace/' -e "f'/workspace/" scripts/*.py || true)
+          if [ -n "$matches" ]; then
+            echo "FAIL: f-string interpolation of /workspace/ detected."
+            echo "Use the canonical _resolve_out helper from scripts/run_model.py."
+            echo ""
+            echo "$matches"
+            exit 1
+          fi
 
   typecheck:
     runs-on: ubuntu-latest
@@ -75,6 +86,9 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ -v --hypothesis-profile=ci
+
+      - name: Validate canonical provenance
+        run: uv run python analysis/load_results.py --strict
 
       - name: Check version consistency
         run: |

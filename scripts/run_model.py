@@ -1,4 +1,4 @@
-"""Run the full observability protocol on any HuggingFace causal LM.
+"""Run the full observability protocol on any Hugging Face causal LM.
 
 Self-contained entry point that executes layer selection on the validation
 split at seed 42, then the full probe battery (baselines, output-controlled,
@@ -10,6 +10,7 @@ import gc
 import json
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -17,6 +18,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from scipy.stats import pearsonr, rankdata, spearmanr
+
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
 
 
 # ===========================================================================
@@ -28,7 +31,13 @@ def load_wikitext(split="test", max_docs=None):
     from datasets import load_dataset
 
     # Stream when max_docs is set to avoid downloading the full split
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split, streaming=bool(max_docs))
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+        streaming=bool(max_docs),
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -200,7 +209,7 @@ def collect_single_layer_fast(model, batches, layer, max_tokens, device, sm_chun
     return collect_multi_layer_fast(model, batches, [layer], max_tokens, device, sm_chunk)[layer]
 
 
-def train_linear_binary(train_data, seed=42, epochs=20, lr=1e-3, train_device="cpu"):
+def train_linear_binary(train_data, seed=42, epochs=20, lr=1e-3, train_device="cuda"):
     torch.manual_seed(seed)
     np.random.seed(seed)
     acts = train_data["activations"].to(train_device)
@@ -247,9 +256,9 @@ def compute_hand_designed(data):
 # CLI
 # ===========================================================================
 
-parser = argparse.ArgumentParser(description="Run full observability protocol on a HuggingFace model.")
-parser.add_argument("--model", required=True, help="HuggingFace model ID (e.g. Qwen/Qwen2.5-7B)")
-parser.add_argument("--output", required=True, help="Output filename (e.g. llama8b_results.json)")
+parser = argparse.ArgumentParser(description="Run full observability protocol on a Hugging Face model.")
+parser.add_argument("--model", required=True, help="Hugging Face model ID (e.g. Qwen/Qwen2.5-7B)")
+parser.add_argument("--output", required=True, help="Output filename (e.g. llama-3.1-8b_main.json)")
 parser.add_argument("--ex-dim", type=int, default=350, help="Examples per hidden dimension (default: 350)")
 parser.add_argument("--batch-size", type=int, default=48, help="Batch size (default: 48)")
 parser.add_argument(
@@ -278,6 +287,19 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+# Fail-fast before model download.
+if not RESULTS_DIR.is_dir():
+    sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+manifest = RESULTS_DIR / "model_revisions.json"
+if not manifest.is_file():
+    sys.exit(f"Manifest missing: {manifest}")
+if args.model not in json.loads(manifest.read_text()).get("models", {}):
+    sys.exit(f"Model {args.model!r} not in manifest")
+ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+if not ds_manifest.is_file():
+    sys.exit(f"Dataset manifest missing: {ds_manifest}")
+DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
+
 
 # ===========================================================================
 # Setup
@@ -286,8 +308,13 @@ args = parser.parse_args()
 if shutil.which("nvidia-smi"):
     subprocess.run(["nvidia-smi"], check=False)
 
-DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-TRAIN_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+if not torch.cuda.is_available():
+    sys.exit(
+        "run_model.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
+TRAIN_DEVICE = "cuda"
 SM_CHUNK = 8
 print(f"Device: {DEVICE}")
 
@@ -307,19 +334,41 @@ def _train(data, seed=42, epochs=20, lr=1e-3):
     return _train_orig(data, seed=seed, epochs=epochs, lr=lr, train_device=TRAIN_DEVICE)
 
 
-model_slug = args.output.replace("_results.json", "").replace(".json", "")
-CHECKPOINT_PATH = Path(f"/workspace/{model_slug}_checkpoint.json")
+# Resolve output and checkpoint paths. /workspace if mounted (pod runs),
+# repo's results/ otherwise (local runs). Absolute paths pass through.
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    if p.is_absolute():
+        return p
+    base = (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+    return base / p
 
 
-def save_checkpoint(phase, **data):
-    ckpt = {"_checkpoint_phase": phase, "_elapsed": elapsed_str()}
+OUT_PATH = _resolve_out(args.output)
+model_slug = Path(args.output).name.replace("_results.json", "").replace(".json", "")
+CHECKPOINT_PATH = _resolve_out(f"{model_slug}_checkpoint.json")
+OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+CHECKPOINT_PATH.parent.mkdir(parents=True, exist_ok=True)
+print(f"Output:     {OUT_PATH}")
+print(f"Checkpoint: {CHECKPOINT_PATH}")
+
+
+def save_checkpoint(stage, **data):
+    ckpt = {"_checkpoint_stage": stage, "_elapsed": elapsed_str()}
     ckpt.update(data)
     try:
         with open(CHECKPOINT_PATH, "w") as f:
             json.dump(ckpt, f, indent=2)
-        print(f"  [checkpoint saved: phase {phase}, {CHECKPOINT_PATH}]")
-    except OSError:
-        pass  # no writable checkpoint directory, skip
+        print(f"  [checkpoint saved: {stage}, {CHECKPOINT_PATH}]")
+    except OSError as e:
+        # The startup mkdir ruled out persistent path errors. A failure
+        # here is transient (disk full, intermittent IO). Log and continue;
+        # losing one checkpoint is recoverable, masking the failure is not.
+        print(f"  [checkpoint write failed: {e!r}; continuing without resume capability]")
 
 
 # ===========================================================================
@@ -333,18 +382,37 @@ TARGET_EX_PER_DIM = args.ex_dim
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-load_kwargs = {"dtype": torch.bfloat16, "attn_implementation": args.attn_impl}
+
+# Look up pinned HF commit from results/model_revisions.json if available.
+# Pod runs without the manifest get an empty dict and load latest main;
+# the actual SHA is still captured in provenance via model.config._commit_hash.
+def _revision_kwargs(model_id):
+    manifest = Path(__file__).resolve().parent.parent / "results" / "model_revisions.json"
+    if not manifest.exists():
+        return {}
+    commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+    return {"revision": commit} if commit else {}
+
+
+_rev_kw = _revision_kwargs(MODEL_ID)
+
+load_kwargs = {"dtype": torch.bfloat16, "attn_implementation": args.attn_impl, **_rev_kw}
 if args.trust_remote_code:
     load_kwargs["trust_remote_code"] = True
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=args.trust_remote_code)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=args.trust_remote_code, **_rev_kw)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 model = AutoModelForCausalLM.from_pretrained(MODEL_ID, **load_kwargs).to(DEVICE)
 model.eval()
 
 # Capture model revision for provenance
-_model_revision = getattr(model.config, "_commit_hash", None) or "unknown"
+_model_revision = _rev_kw.get("revision") or getattr(model.config, "_commit_hash", None)
+if not _model_revision:
+    raise RuntimeError(
+        f"Could not resolve model revision for {MODEL_ID}: pin via results/model_revisions.json "
+        "or upgrade transformers (model.config._commit_hash unset)."
+    )
 
 # Some models (e.g., Gemma 3) nest config under text_config
 _cfg = getattr(model.config, "text_config", model.config)
@@ -380,8 +448,8 @@ test_batches = build_batches(wiki_test_enc, BATCH_SIZE)
 print(f"Batches: {len(train_batches)} train, {len(val_batches)} val, {len(test_batches)} test")
 del wiki_train_docs, wiki_val_docs, wiki_test_docs, wiki_train_enc, wiki_val_enc, wiki_test_enc
 
-# --- Phase 1: All-layer sweep ---
-print(f"\n=== Phase 1: Sweeping {N_LAYERS} layers, {LAYERS_PER_PASS} per pass [{elapsed_str()}] ===")
+# --- Layer sweep ---
+print(f"\n=== Sweeping {N_LAYERS} layers, {LAYERS_PER_PASS} per pass [{elapsed_str()}] ===")
 layer_profile = {}
 layer_chunks = [
     list(range(i, min(i + LAYERS_PER_PASS, N_LAYERS))) for i in range(0, N_LAYERS, LAYERS_PER_PASS)
@@ -425,7 +493,7 @@ if peak_layer not in candidates:
     candidates.sort()
 print(f"\nPeak: L{peak_layer}, candidates: {candidates}")
 save_checkpoint(
-    "1_sweep",
+    "sweep_done",
     model=MODEL_ID,
     n_layers=N_LAYERS,
     hidden_dim=HIDDEN_DIM,
@@ -434,11 +502,11 @@ save_checkpoint(
     candidates=candidates,
 )
 
-# --- Phase 2: Collect at candidates + output ---
+# --- Collect at candidates + output ---
 # Chunk candidates by LAYERS_PER_PASS so peak GPU memory is bounded by chunk
 # size, not candidate count. Bit-identical to one-shot collection since the
 # forward pass is deterministic under eval + inference_mode.
-print(f"\n=== Phase 2: Collecting candidates + output [{elapsed_str()}] ===")
+print(f"\n=== Collecting candidates + output [{elapsed_str()}] ===")
 train_cache = {}
 val_cache = {}
 for i in range(0, len(candidates), LAYERS_PER_PASS):
@@ -458,8 +526,8 @@ print(f"  Collecting output layer L{output_layer}...")
 wiki_train_output = collect_single_layer_fast(model, train_batches, output_layer, MAX_TRAIN, DEVICE)
 wiki_val_output = collect_single_layer_fast(model, val_batches, output_layer, MAX_TRAIN, DEVICE)
 
-# --- Phase 3: Multi-seed eval ---
-print(f"\n=== Phase 3: Multi-seed eval [{elapsed_str()}] ===")
+# --- Multi-seed eval ---
+print(f"\n=== Multi-seed eval [{elapsed_str()}] ===")
 layer_eval = {}
 for layer in candidates:
     seed_rhos, seed_scores = [], []
@@ -497,7 +565,7 @@ gc.collect()
 
 print(f"FINAL: L{FINAL} = {ev['mean']:+.4f} +/- {ev['std']:.4f}")
 save_checkpoint(
-    "3_multiseed",
+    "multiseed_done",
     model=MODEL_ID,
     n_layers=N_LAYERS,
     hidden_dim=HIDDEN_DIM,
@@ -509,8 +577,8 @@ save_checkpoint(
     seed_agreement={"mean": ev["seed_agreement"]},
 )
 
-# --- Phase 4: Test + C4 ---
-print(f"\n=== Phase 4: Test + C4 at FINAL [{elapsed_str()}] ===")
+# --- Test + C4 ---
+print(f"\n=== Test + C4 at FINAL [{elapsed_str()}] ===")
 wiki_test_peak = collect_single_layer_fast(model, test_batches, FINAL, MAX_TRAIN, DEVICE)
 
 c4_test_peak = None
@@ -521,7 +589,13 @@ if not args.skip_c4:
     from datasets import load_dataset
 
     c4_docs = []
-    ds = load_dataset("allenai/c4", "en", split="validation", streaming=True)
+    ds = load_dataset(
+        "allenai/c4",
+        "en",
+        split="validation",
+        revision=DATASET_REVISIONS["allenai/c4"]["commit"],
+        streaming=True,
+    )
     for i, row in enumerate(ds):
         if i < 50000:
             continue
@@ -535,7 +609,13 @@ if not args.skip_c4:
     c4_test_peak = collect_single_layer_fast(model, c4_test_batches, FINAL, MAX_TRAIN // 2, DEVICE)
 
     c4_train_docs = []
-    ds2 = load_dataset("allenai/c4", "en", split="validation", streaming=True)
+    ds2 = load_dataset(
+        "allenai/c4",
+        "en",
+        split="validation",
+        revision=DATASET_REVISIONS["allenai/c4"]["commit"],
+        streaming=True,
+    )
     for row in ds2:
         text = row["text"].strip()
         if len(text) > 100:
@@ -554,8 +634,8 @@ if DEVICE == "cuda":
     torch.cuda.empty_cache()
 print(f"Model unloaded. [{elapsed_str()}]")
 
-# --- Phase 5: Full battery ---
-print(f"\n=== Phase 5: Full battery [{elapsed_str()}] ===")
+# --- Full battery ---
+print(f"\n=== Full battery [{elapsed_str()}] ===")
 test_rhos = [float(evaluate_head(_train(wiki_train_peak, seed=s), wiki_test_peak)[1]) for s in EVAL_SEEDS[:3]]
 print(f"  test mean: {np.mean(test_rhos):+.4f}")
 
@@ -586,7 +666,7 @@ for n, v in baseline_results.items():
 
 # Output-controlled (train on GPU since model is unloaded)
 print("\n  Output-controlled:")
-OC_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+OC_DEVICE = "cuda"
 # Move training data to GPU once, reuse across seeds
 oc_train_acts = wiki_train_output["activations"].to(OC_DEVICE)
 oc_train_losses = torch.from_numpy(wiki_train_output["losses"]).float().to(OC_DEVICE)
@@ -755,10 +835,9 @@ output = {
     "provenance": {
         "model_revision": _model_revision,
         "script": "scripts/run_model.py",
-        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(),
+        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+        "value_source": "runtime",
         "device": str(DEVICE),
-        "torch_version": torch.__version__,
-        "output_file": args.output,
     },
     "protocol": {
         "layer_select_seed": LAYER_SELECT_SEED,
@@ -787,16 +866,9 @@ output = {
     "flagging_6a": {"n_tokens": nf, "summary": fs},
 }
 
-# Save to /workspace/ if it exists, otherwise results/
-if Path("/workspace").exists():
-    out_path = Path(f"/workspace/{args.output}")
-else:
-    out_path = Path(__file__).resolve().parent.parent / "results" / args.output
-    out_path.parent.mkdir(exist_ok=True)
-
-with open(out_path, "w") as f:
+with open(OUT_PATH, "w") as f:
     json.dump(output, f, indent=2)
-print(f"Saved {out_path}")
+print(f"Saved {OUT_PATH}")
 print(f"FINAL: L{FINAL} = {ev['mean']:+.4f} +/- {ev['std']:.4f}")
 print(f"Output-controlled: {np.mean(ctrl_rhos):+.4f}")
 print(f"Cross-domain C4: {domain_results.get('c4', '?')}")

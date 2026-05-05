@@ -57,12 +57,6 @@ def main() -> None:
         to = json.loads(to_path.read_text())
         exclusive_catch_table("GPT-2 124M", to["6a"])
 
-    # Qwen 7B base
-    q7_path = RESULTS_DIR / "qwen7b_flagging_results.json"
-    if q7_path.exists():
-        q7 = json.loads(q7_path.read_text())
-        exclusive_catch_table("Qwen 7B base", q7["flagging_6a"])
-
     print("\n" + "=" * 60)
     print("The exclusive catch is present at every flag rate tested.")
     print("It grows with flag rate up to ~20%, then saturates.")

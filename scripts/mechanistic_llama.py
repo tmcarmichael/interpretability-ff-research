@@ -5,6 +5,7 @@ model within the same family. Tests whether the 3B signal is never
 generated or generated and then suppressed by a specific component.
 """
 
+import datetime as _dt
 import gc
 import json
 import sys
@@ -13,15 +14,54 @@ from pathlib import Path
 
 import torch
 
-# Add src/ to path
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
+
+# Add src/ to path for transformer_observe import
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    if p.is_absolute():
+        return p
+    base = (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+    return base / p
+
+
+def _revision_kwargs(model_id):
+    manifest = Path(__file__).resolve().parent.parent / "results" / "model_revisions.json"
+    if not manifest.exists():
+        return {}
+    commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+    return {"revision": commit} if commit else {}
+
+
+TARGET_PATHS = {
+    "llama_1b": _resolve_out("llama-3.2-1b_mechanistic.json"),
+    "llama_3b": _resolve_out("llama-3.2-3b_mechanistic.json"),
+}
+for _p in TARGET_PATHS.values():
+    _p.parent.mkdir(parents=True, exist_ok=True)
+for _label, _p in TARGET_PATHS.items():
+    print(f"Output {_label}: {_p}")
 
 from transformer_observe import (
     load_wikitext,
     run_mechanistic_general,
 )
 
-DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
+if not torch.cuda.is_available():
+    import sys
+
+    sys.exit(
+        "mechanistic_llama.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
 RUN_START = time.time()
 
 
@@ -42,6 +82,17 @@ MODELS = [
         "label": "llama_3b",
     },
 ]
+
+# Fail-fast before model download.
+if not RESULTS_DIR.is_dir():
+    sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+manifest = RESULTS_DIR / "model_revisions.json"
+if not manifest.is_file():
+    sys.exit(f"Manifest missing: {manifest}")
+_known = json.loads(manifest.read_text()).get("models", {})
+for _spec in MODELS:
+    if _spec["model_id"] not in _known:
+        sys.exit(f"Model {_spec['model_id']!r} not in manifest")
 
 print(f"Device: {DEVICE}")
 print(f"Models: {[m['label'] for m in MODELS]}")
@@ -65,12 +116,14 @@ for spec in MODELS:
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    _rev_kw = _revision_kwargs(model_id)
+
+    tokenizer = AutoTokenizer.from_pretrained(model_id, **_rev_kw)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     dtype = torch.float16
-    model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=dtype).to(DEVICE)
+    model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype, **_rev_kw).to(DEVICE)
     model.eval()
 
     n_layers = model.config.num_hidden_layers
@@ -103,21 +156,35 @@ for spec in MODELS:
     mech["n_params_b"] = round(n_params / 1e9, 1)
     mech["n_layers"] = n_layers
     mech["hidden_dim"] = hidden_dim
+    _revision = _rev_kw.get("revision") or getattr(model.config, "_commit_hash", None)
+    if not _revision:
+        raise RuntimeError(
+            f"Could not resolve model revision for {model_id}: pin via results/model_revisions.json "
+            "or upgrade transformers (model.config._commit_hash unset)."
+        )
+    mech["provenance"] = {
+        "model_revision": _revision,
+        "script": "scripts/mechanistic_llama.py",
+        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+        "value_source": "runtime",
+        "device": str(DEVICE),
+    }
     results[label] = mech
 
     # Free memory
     del model, tokenizer
     gc.collect()
-    if DEVICE == "mps":
-        torch.mps.empty_cache()
+    torch.cuda.empty_cache()
 
     print(f"\n  {label} complete [{elapsed()}]")
 
-# Save
-out_path = Path(__file__).resolve().parent.parent / "results" / "mechanistic_llama_comparison.json"
-with open(out_path, "w") as f:
-    json.dump(results, f, indent=2)
-print(f"\nSaved {out_path}")
+# Save per-model files matching the schema of other mechanistic results
+# (qwen2.5-7b_mechanistic.json, mistral-7b-v0.3_mechanistic.json).
+for label, mech in results.items():
+    target = TARGET_PATHS[label]
+    with open(target, "w") as f:
+        json.dump(mech, f, indent=2)
+    print(f"\nSaved {target}")
 print(f"Total time: {elapsed()}")
 
 # Quick comparison summary

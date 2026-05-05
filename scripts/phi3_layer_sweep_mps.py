@@ -282,7 +282,6 @@ def main():
         "n_layers": n_layers,
         "hidden_dim": hidden_dim,
         "device": DEVICE,
-        "dtype": str(dtype),
         "attn_implementation": attn,
         "protocol": {
             "sweep_layers": sweep,
