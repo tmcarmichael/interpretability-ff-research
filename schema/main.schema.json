@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/main.schema.json",
+  "title": "Observability protocol result (main)",
+  "description": "Single-model output of scripts/run_model.py. One JSON per model under canonical 350 ex/dim 7-seed protocol.",
+  "type": "object",
+  "required": [
+    "model",
+    "n_params_b",
+    "n_layers",
+    "hidden_dim",
+    "provenance",
+    "protocol",
+    "layer_profile",
+    "partial_corr",
+    "control_sensitivity"
+  ],
+  "anyOf": [
+    {"required": ["peak_layer_final"]},
+    {"required": ["peak_layer"]}
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "model": {
+      "type": "string",
+      "description": "Hugging Face model identifier (org/name)."
+    },
+    "n_params_b": {"type": "number", "minimum": 0},
+    "n_layers": {"type": "integer", "minimum": 1},
+    "hidden_dim": {"type": "integer", "minimum": 1},
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "protocol": {
+      "type": "object",
+      "required": ["target_ex_per_dim", "eval_seeds"],
+      "properties": {
+        "layer_select_seed": {"type": "integer"},
+        "eval_seeds": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "minItems": 1
+        },
+        "target_ex_per_dim": {"type": "integer", "minimum": 1},
+        "batch_size": {"type": "integer", "minimum": 1},
+        "layers_per_pass": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": true
+    },
+    "peak_layer_final": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Peak layer index after multi-seed evaluation (canonical)."
+    },
+    "peak_layer": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Peak layer index (legacy field name; equivalent to peak_layer_final)."
+    },
+    "peak_layer_frac": {"type": "number", "minimum": 0, "maximum": 1},
+    "layer_profile": {
+      "type": "object",
+      "description": "Per-layer pcorr; keys are stringified layer indices.",
+      "patternProperties": {
+        "^[0-9]+$": {"type": "number"}
+      },
+      "additionalProperties": false
+    },
+    "multi_layer_eval": {
+      "type": "object",
+      "description": "Multi-seed evaluation at top candidate layers.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "mean": {"type": "number"},
+          "std": {"type": "number", "minimum": 0},
+          "per_seed": {"type": "array", "items": {"type": "number"}},
+          "seed_agreement": {"type": "number"}
+        }
+      }
+    },
+    "partial_corr": {
+      "$ref": "#/$defs/distribution",
+      "description": "Confidence-controlled partial Spearman at peak layer."
+    },
+    "test_split_comparison": {
+      "type": "object",
+      "properties": {
+        "mean": {"type": "number"},
+        "per_seed": {"type": "array", "items": {"type": "number"}}
+      }
+    },
+    "seed_agreement": {
+      "type": "object",
+      "properties": {"mean": {"type": "number", "minimum": -1, "maximum": 1}}
+    },
+    "output_controlled": {
+      "type": "object",
+      "description": "Output-controlled residual (rho after also controlling for trained final-layer predictor).",
+      "properties": {
+        "mean": {"type": "number"},
+        "per_seed": {"type": "array", "items": {"type": "number"}}
+      }
+    },
+    "baselines": {
+      "type": "object",
+      "description": "Hand-designed baseline pcorr values (FF goodness, activation norm, etc.).",
+      "additionalProperties": {"type": "number"}
+    },
+    "cross_domain": {
+      "type": "object",
+      "description": "Cross-domain transfer: WikiText-trained probe on WikiText test, C4 test, C4 within (C4-trained on C4-test).",
+      "properties": {
+        "wikitext": {"type": "number"},
+        "c4": {"type": "number"},
+        "c4_within": {"type": "number"}
+      },
+      "additionalProperties": false
+    },
+    "control_sensitivity": {
+      "type": "object",
+      "description": "Partial Spearman under different covariate sets.",
+      "required": ["none", "softmax_only", "standard"],
+      "properties": {
+        "none": {"type": "number"},
+        "softmax_only": {"type": "number"},
+        "norm_only": {"type": "number"},
+        "standard": {"type": "number"},
+        "plus_entropy": {"type": "number"},
+        "nonlinear": {"type": "number"}
+      },
+      "additionalProperties": true
+    },
+    "flagging_6a": {
+      "type": "object",
+      "description": "Selective-prediction flagging summary at peak layer.",
+      "properties": {
+        "n_tokens": {"type": "integer"},
+        "summary": {"type": "object"}
+      }
+    }
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {
+          "type": "string",
+          "description": "Full 40-char Hugging Face commit SHA.",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "script": {
+          "type": "string",
+          "description": "Generating script path relative to repo root."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC ISO-8601 second precision."
+        },
+        "value_source": {
+          "type": "string",
+          "enum": ["runtime", "post_hoc_deterministic"],
+          "description": "How values were produced. 'runtime': written at experiment time. 'post_hoc_deterministic': re-derived from inputs whose hashes are pinned, so reproducible without rerun."
+        },
+        "device": {
+          "type": "string",
+          "enum": ["cuda", "mps", "cpu"],
+          "description": "Compute device. Paper-cited JSONs MUST be 'cuda'."
+        }
+      },
+      "additionalProperties": true
+    },
+    "distribution": {
+      "type": "object",
+      "description": "Multi-seed scalar distribution.",
+      "required": ["mean"],
+      "properties": {
+        "mean": {"type": "number"},
+        "std": {"type": "number", "minimum": 0},
+        "per_seed": {
+          "type": "array",
+          "items": {"type": "number"},
+          "minItems": 1
+        },
+        "n_seeds": {"type": "integer", "minimum": 1},
+        "split": {"type": "string"}
+      }
+    }
+  }
+}

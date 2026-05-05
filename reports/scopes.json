@@ -1,0 +1,68 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05T04:31:25+00:00",
+  "generated_from": "scripts/export_scopes.py",
+  "source": "analysis/load_results.py",
+  "scopes": {
+    "cross_family_14": {
+      "description": "Cross-family aggregate scope (paper Sections 3 and 5).",
+      "models": [
+        "GPT2-1.5B",
+        "GPT2-124M",
+        "GPT2-355M",
+        "GPT2-774M",
+        "Gemma-1B",
+        "Llama-3B",
+        "Mistral-7B",
+        "Phi-3-Mini",
+        "Qwen-0.5B",
+        "Qwen-1.5B",
+        "Qwen-14B",
+        "Qwen-32B",
+        "Qwen-3B",
+        "Qwen-7B"
+      ],
+      "n_models": 14
+    },
+    "control_sensitivity_14": {
+      "description": "Same set as cross_family_14, used for control-sensitivity statistics.",
+      "models": [
+        "GPT2-1.5B",
+        "GPT2-124M",
+        "GPT2-355M",
+        "GPT2-774M",
+        "Gemma-1B",
+        "Llama-3B",
+        "Mistral-7B",
+        "Phi-3-Mini",
+        "Qwen-0.5B",
+        "Qwen-1.5B",
+        "Qwen-14B",
+        "Qwen-32B",
+        "Qwen-3B",
+        "Qwen-7B"
+      ],
+      "n_models": 14
+    },
+    "pythia_controlled_9": {
+      "description": "Pythia controlled suite (paper Section 4).",
+      "models": [
+        "Pythia-1.4B",
+        "Pythia-1.4B-deduped",
+        "Pythia-12B",
+        "Pythia-160M",
+        "Pythia-1B",
+        "Pythia-2.8B",
+        "Pythia-410M",
+        "Pythia-6.9B",
+        "Pythia-70M"
+      ],
+      "n_models": 9
+    },
+    "all": {
+      "description": "All loaded models; no scope filter applied.",
+      "models": null,
+      "n_models": null
+    }
+  }
+}

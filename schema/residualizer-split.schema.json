@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/residualizer-split.schema.json",
+  "title": "Residualizer-fit split robustness result",
+  "description": "Output of scripts/run_residualizer_split.py. Tests whether the OLS residualizer overfits to the probe-training pool by fitting it on a disjoint document pool R and applying without refit to the probe-training pool T. One JSON per model.",
+  "type": "object",
+  "required": [
+    "model",
+    "n_layers",
+    "hidden_dim",
+    "layer",
+    "provenance",
+    "protocol",
+    "residualizer_beta_main",
+    "residualizer_beta_split",
+    "main",
+    "split_fit",
+    "delta_rho"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "model": {"type": "string"},
+    "n_layers": {"type": "integer", "minimum": 1},
+    "hidden_dim": {"type": "integer", "minimum": 1},
+    "layer": {"type": "integer", "minimum": 0},
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {"type": "string"},
+        "script": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value_source": {"type": "string", "enum": ["runtime", "post_hoc_deterministic"]},
+        "device": {"type": "string", "enum": ["cuda", "mps", "cpu"]}
+      },
+      "additionalProperties": true
+    },
+    "protocol": {
+      "type": "object",
+      "required": ["ex_per_dim", "n_seeds", "eval_seeds", "n_tokens_T", "n_tokens_R", "n_tokens_V"],
+      "properties": {
+        "ex_per_dim": {"type": "integer", "minimum": 1},
+        "batch_size": {"type": "integer", "minimum": 1},
+        "n_seeds": {"type": "integer", "minimum": 1},
+        "eval_seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 1},
+        "n_tokens_T": {"type": "integer", "minimum": 1},
+        "n_tokens_R": {"type": "integer", "minimum": 1},
+        "n_tokens_V": {"type": "integer", "minimum": 1},
+        "n_docs_T": {"type": "integer", "minimum": 1},
+        "n_docs_R": {"type": "integer", "minimum": 1},
+        "n_docs_V": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": true
+    },
+    "residualizer_beta_main": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "OLS coefficients fit on T: [softmax_coef, norm_coef, intercept]."
+    },
+    "residualizer_beta_split": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "OLS coefficients fit on R: [softmax_coef, norm_coef, intercept]."
+    },
+    "main": {
+      "$ref": "#/$defs/regime_result",
+      "description": "Probe trained on T using residualizer fit on T (in-sample residualizer)."
+    },
+    "split_fit": {
+      "$ref": "#/$defs/regime_result",
+      "description": "Probe trained on T using residualizer fit on R (held-out residualizer)."
+    },
+    "delta_rho": {
+      "type": "number",
+      "description": "split_fit.mean - main.mean"
+    }
+  },
+  "$defs": {
+    "regime_result": {
+      "type": "object",
+      "required": ["mean", "per_seed"],
+      "properties": {
+        "mean": {"type": "number"},
+        "std": {"type": "number", "minimum": 0},
+        "per_seed": {"type": "array", "items": {"type": "number"}, "minItems": 1},
+        "pos_label_fraction": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    }
+  }
+}

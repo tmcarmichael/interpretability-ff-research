@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/nonlinear-probe.schema.json",
+  "title": "Nonlinear-vs-linear probe comparison",
+  "description": "Output of scripts/nonlinear_probe.py (and the multilayer variant). One JSON per model. Compares 2-layer MLP probe to a linear head at the peak layer.",
+  "type": "object",
+  "required": [
+    "model",
+    "hidden_dim",
+    "peak_layer",
+    "ex_dim",
+    "seeds",
+    "fixed_hp",
+    "swept_hp",
+    "conclusion",
+    "provenance"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "model": {"type": "string"},
+    "hidden_dim": {"type": "integer", "minimum": 1},
+    "peak_layer": {"type": "integer", "minimum": 0},
+    "ex_dim": {"type": "integer", "minimum": 1},
+    "seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 1},
+    "fixed_hp": {
+      "type": "object",
+      "description": "Fixed-hyperparameter probe results. per_seed is an array of per-seed records; the exact field set inside each record varies by run (linear, mlp_64, mlp_128, delta_64, ...).",
+      "required": ["per_seed"],
+      "properties": {
+        "per_seed": {
+          "type": "array",
+          "items": {"type": "object", "required": ["seed"]},
+          "minItems": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "swept_hp": {
+      "type": "object",
+      "description": "Hyperparameter-swept probe results. per_seed is an array of per-seed records (linear, best_mlp, best_config, delta, ...).",
+      "required": ["per_seed"],
+      "properties": {
+        "per_seed": {
+          "type": "array",
+          "items": {"type": "object", "required": ["seed"]},
+          "minItems": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "swept_hp_holdout": {
+      "type": "object",
+      "description": "Held-out MLP-probe partial Spearman; appears in newer runs only.",
+      "additionalProperties": true
+    },
+    "protocol": {"type": "object", "additionalProperties": true},
+    "conclusion": {"type": "string", "description": "Free-form summary of the linear-vs-nonlinear comparison."},
+    "provenance": {"$ref": "#/$defs/provenance"}
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "script": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value_source": {"type": "string", "enum": ["runtime", "post_hoc_deterministic"]},
+        "device": {"type": "string", "enum": ["cuda", "mps", "cpu"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

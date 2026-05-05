@@ -12,7 +12,9 @@ from typing import Any
 
 import numpy as np
 
-RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+RESULTS_DIR = REPO_ROOT / "results"
+FIXTURES_DIR = REPO_ROOT / "tests" / "fixtures"
 
 
 # ── Schema for results JSONs ──────────────────────────────────────────
@@ -29,6 +31,7 @@ REQUIRED_FIELDS = {
     "peak_layer_frac": (int, float),
     "seed_agreement": (dict, int, float),
     "baselines": dict,
+    "provenance.device": str,
 }
 
 # Fields where either name is acceptable (older vs newer convention)
@@ -101,12 +104,16 @@ def validate_results_json(data: dict, filename: str, strict: bool = False) -> li
     if isinstance(peak_frac, (int, float)) and not (0.0 <= peak_frac <= 1.0):
         warnings.append(f"{filename}: peak_layer_frac={peak_frac} outside [0, 1]")
 
+    device = _get_nested(data, "provenance.device")
+    if isinstance(device, str) and device != "cuda":
+        warnings.append(f"{filename}: provenance.device='{device}' (expected 'cuda')")
+
     return warnings
 
 
 DYNAMICS_FILES = [
-    ("pythia_1b_dynamics_results.json", "Pythia-1B (16L/8H) dynamics"),
-    ("pythia_14b_dynamics_results.json", "Pythia-1.4B (24L/16H) dynamics"),
+    ("pythia-1b_dynamics.json", "Pythia-1B (16L/8H) dynamics"),
+    ("pythia-1.4b_dynamics.json", "Pythia-1.4B (24L/16H) dynamics"),
 ]
 
 DYNAMICS_REQUIRED_TOP = {
@@ -181,88 +188,136 @@ GPT2_MODELS = [
 ]
 
 QWEN_MODELS = [
-    ("qwen05b_v3_results.json", 0.5, "Qwen-0.5B"),
-    ("qwen1_5b_v3_results.json", 1.5, "Qwen-1.5B"),
-    ("qwen3b_v3_results.json", 3.0, "Qwen-3B"),
-    ("qwen7b_v3_results.json", 7.6, "Qwen-7B"),
-    ("qwen14b_v3_results.json", 14.0, "Qwen-14B"),
+    ("qwen2.5-0.5b_main.json", 0.5, "Qwen-0.5B"),
+    ("qwen2.5-1.5b_main.json", 1.5, "Qwen-1.5B"),
+    ("qwen2.5-3b_main.json", 3.0, "Qwen-3B"),
+    ("qwen2.5-7b_main.json", 7.6, "Qwen-7B"),
+    ("qwen2.5-14b_main.json", 14.0, "Qwen-14B"),
+    ("qwen2.5-32b_main.json", 32.0, "Qwen-32B"),
 ]
 
-QWEN_FALLBACKS = {
-    "qwen05b_v3_results.json": "qwen05b_v2_results.json",
-    "qwen1_5b_v3_results.json": "qwen1_5b_v2_results.json",
-    "qwen3b_v3_results.json": "qwen3b_v2_results.json",
-    "qwen7b_v3_results.json": "qwen7b_comprehensive.json",
-}
-
 LLAMA_MODELS = [
-    ("llama3b_v3_results.json", 3.0, "Llama-3B"),
+    ("llama-3.2-3b_main.json", 3.0, "Llama-3B"),
 ]
 
 GEMMA_MODELS = [
-    ("gemma3_1b_results.json", 1.0, "Gemma-1B"),
+    ("gemma-3-1b_main.json", 1.0, "Gemma-1B"),
 ]
 
 MISTRAL_MODELS = [
-    ("mistral7b_results.json", 7.25, "Mistral-7B"),
+    ("mistral-7b-v0.3_main.json", 7.25, "Mistral-7B"),
 ]
 
 PHI_MODELS = [
-    ("phi3_mini_results.json", 3.82, "Phi-3-Mini"),
+    ("phi-3-mini_main.json", 3.82, "Phi-3-Mini"),
 ]
 
 PYTHIA_MODELS = [
-    ("pythia_70m_results.json", 0.07, "Pythia-70M"),
-    ("pythia_160m_results.json", 0.16, "Pythia-160M"),
-    ("pythia_410m_results.json", 0.41, "Pythia-410M"),
-    ("pythia1b_results.json", 1.0, "Pythia-1B"),
-    ("pythia1_4b_results.json", 1.4, "Pythia-1.4B"),
-    ("pythia_1.4b_deduped_results.json", 1.4, "Pythia-1.4B-deduped"),
-    ("pythia_2.8b_results.json", 2.8, "Pythia-2.8B"),
-    ("pythia_6.9b_results.json", 6.9, "Pythia-6.9B"),
-    ("pythia_12b_results.json", 12.0, "Pythia-12B"),
+    ("pythia-70m_main.json", 0.07, "Pythia-70M"),
+    ("pythia-160m_main.json", 0.16, "Pythia-160M"),
+    ("pythia-410m_main.json", 0.41, "Pythia-410M"),
+    ("pythia-1b_main.json", 1.0, "Pythia-1B"),
+    ("pythia-1.4b_main.json", 1.4, "Pythia-1.4B"),
+    ("pythia-1.4b-deduped_main.json", 1.4, "Pythia-1.4B-deduped"),
+    ("pythia-2.8b_main.json", 2.8, "Pythia-2.8B"),
+    ("pythia-6.9b_main.json", 6.9, "Pythia-6.9B"),
+    ("pythia-12b_main.json", 12.0, "Pythia-12B"),
 ]
 
 
+# ── Named analysis scopes ────────────────────────────────────────────
+#
+# Use these to reproduce specific paper-table numbers. The default loaders
+# return everything; pass scope="<name>" to filter. Headline scripts
+# (permutation_test, selectivity) default to the paper-Section-5 scope.
+
+_CROSS_FAMILY_14 = frozenset(
+    {
+        "GPT2-124M",
+        "GPT2-355M",
+        "GPT2-774M",
+        "GPT2-1.5B",
+        "Qwen-0.5B",
+        "Qwen-1.5B",
+        "Qwen-3B",
+        "Qwen-7B",
+        "Qwen-14B",
+        "Qwen-32B",
+        "Llama-3B",
+        "Gemma-1B",
+        "Mistral-7B",
+        "Phi-3-Mini",
+    }
+)
+_PYTHIA_CONTROLLED_9 = frozenset(
+    {
+        "Pythia-70M",
+        "Pythia-160M",
+        "Pythia-410M",
+        "Pythia-1B",
+        "Pythia-1.4B",
+        "Pythia-1.4B-deduped",
+        "Pythia-2.8B",
+        "Pythia-6.9B",
+        "Pythia-12B",
+    }
+)
+
+SCOPES: dict[str, frozenset[str] | None] = {
+    "cross_family_14": _CROSS_FAMILY_14,
+    "control_sensitivity_14": _CROSS_FAMILY_14,
+    "pythia_controlled_9": _PYTHIA_CONTROLLED_9,
+    "all": None,
+}
+
+
 def _load_gpt2() -> dict[str, dict[str, Any]]:
-    """Load GPT-2 scaling results from transformer_observe.json phase 8."""
-    path = RESULTS_DIR / "transformer_observe.json"
-    if not path.exists():
-        return {}
-    to = json.loads(path.read_text())
-    p8 = to.get("8", {}).get("models", {})
+    """Load GPT-2 scaling results from per-size matched-protocol files.
+
+    All four sizes (124M, 355M, 774M, 1.5B) are read from gpt2-{size}_main.json
+    under the canonical 350 ex/dim, 7-seed cross-family protocol. The legacy
+    transformer_observe.json phase-8 entries (varying ex/dim per size) are no
+    longer the source of truth; transformer_observe.json is retained only for
+    the 124M hardening, hand-designed baselines, and analytical random-baseline
+    flagging experiments that live outside this scaling test.
+    """
+    name_to_file = {
+        "gpt2": "gpt2-124m_main.json",
+        "gpt2-medium": "gpt2-medium_main.json",
+        "gpt2-large": "gpt2-large_main.json",
+        "gpt2-xl": "gpt2-xl_main.json",
+    }
     models = {}
     for name, params_b, label in GPT2_MODELS:
-        if name not in p8:
+        path = RESULTS_DIR / name_to_file[name]
+        if not path.exists():
             continue
-        m = p8[name]
+        d = json.loads(path.read_text())
         models[label] = {
             "family": "GPT-2",
             "params_b": params_b,
             "label": label,
-            "partial_corr": m.get("partial_corr", {}),
-            "baselines": m.get("baselines", {}),
+            "partial_corr": d.get("partial_corr", {}),
+            "baselines": d.get("baselines", {}),
+            "source_file": name_to_file[name],
         }
-    # Control sensitivity for GPT-2 124M is stored separately
-    cs = to.get("control_sensitivity", {}).get("control_sets", {})
-    if cs and "GPT2-124M" in models:
-        models["GPT2-124M"]["control_sensitivity"] = {k: v["mean"] for k, v in cs.items()}
+        cs = d.get("control_sensitivity", {})
+        if cs:
+            models[label]["control_sensitivity"] = {
+                k: (v["mean"] if isinstance(v, dict) else v) for k, v in cs.items()
+            }
     return models
 
 
 def _load_family(
-    file_list: list[tuple[str, float, str]], family_name: str, fallbacks: dict[str, str] | None = None
+    file_list: list[tuple[str, float, str]],
+    family_name: str,
 ) -> dict[str, dict[str, Any]]:
     models = {}
     for fname, params_b, label in file_list:
         path = RESULTS_DIR / fname
-        used_fallback = False
-        if not path.exists() and fallbacks and fname in fallbacks:
-            path = RESULTS_DIR / fallbacks[fname]
-            used_fallback = True
         if not path.exists():
-            print(f"  WARNING: {fname} not found for {label} ({family_name})")
-            continue
+            raise FileNotFoundError(f"{fname} not found for {label} ({family_name}); expected at {path}")
         d = json.loads(path.read_text())
         schema_warnings = validate_results_json(d, path.name)
         for w in schema_warnings:
@@ -284,27 +339,41 @@ def _load_family(
             "control_sensitivity": d.get("control_sensitivity", {}),
             "source_file": path.name,
         }
-        if used_fallback:
-            entry["fallback"] = True
-            print(f"  NOTE: {label} using fallback {path.name} (primary {fname} not found)")
         models[label] = entry
     return models
 
 
-def load_all_models(verbose: bool = False) -> dict[str, dict[str, Any]]:
-    """Load all paper-scope models, keyed by label."""
+def _resolve_scope(scope: str | None) -> frozenset[str] | None:
+    if scope is None:
+        return None
+    if scope not in SCOPES:
+        raise ValueError(f"Unknown scope '{scope}'. Known scopes: {sorted(SCOPES)}")
+    return SCOPES[scope]
+
+
+def load_all_models(verbose: bool = False, scope: str | None = None) -> dict[str, dict[str, Any]]:
+    """Load all paper-scope models, keyed by label.
+
+    With scope=None (default), loads every model in the family lists. Pass a
+    named scope from SCOPES (e.g. 'cross_family_14', 'pythia_controlled_9')
+    to filter to the model set used by a specific paper table.
+    """
+    allowed = _resolve_scope(scope)
     models = {}
     models.update(_load_gpt2())
-    models.update(_load_family(QWEN_MODELS, "Qwen", QWEN_FALLBACKS))
+    models.update(_load_family(QWEN_MODELS, "Qwen"))
     models.update(_load_family(LLAMA_MODELS, "Llama"))
     models.update(_load_family(GEMMA_MODELS, "Gemma"))
     models.update(_load_family(MISTRAL_MODELS, "Mistral"))
     models.update(_load_family(PHI_MODELS, "Phi"))
     models.update(_load_family(PYTHIA_MODELS, "Pythia"))
 
+    if allowed is not None:
+        models = {label: m for label, m in models.items() if label in allowed}
+
     if verbose:
-        # Report what loaded and what's missing
-        expected = (
+        # Report what loaded and what's missing (relative to scope when set)
+        expected_all = (
             [(l, "GPT-2") for _, _, l in GPT2_MODELS]
             + [(l, "Qwen") for _, _, l in QWEN_MODELS]
             + [(l, "Llama") for _, _, l in LLAMA_MODELS]
@@ -313,6 +382,10 @@ def load_all_models(verbose: bool = False) -> dict[str, dict[str, Any]]:
             + [(l, "Phi") for _, _, l in PHI_MODELS]
             + [(l, "Pythia") for _, _, l in PYTHIA_MODELS]
         )
+        if allowed is not None:
+            expected = [(l, f) for l, f in expected_all if l in allowed]
+        else:
+            expected = expected_all
         loaded = set(models.keys())
         missing = [(l, f) for l, f in expected if l not in loaded]
         if missing:
@@ -323,10 +396,10 @@ def load_all_models(verbose: bool = False) -> dict[str, dict[str, Any]]:
     return models
 
 
-def load_per_seed() -> list[tuple[str, str, float, int, float]]:
+def load_per_seed(scope: str | None = None) -> list[tuple[str, str, float, int, float]]:
     """Per-seed observations: (family, label, params_b, seed_idx, pcorr)."""
     rows = []
-    models = load_all_models()
+    models = load_all_models(scope=scope)
     for label, m in models.items():
         pc = m["partial_corr"]
         seeds = pc.get("per_seed", [])
@@ -338,9 +411,9 @@ def load_per_seed() -> list[tuple[str, str, float, int, float]]:
     return rows
 
 
-def load_model_means() -> list[tuple[str, float, float]]:
+def load_model_means(scope: str | None = None) -> list[tuple[str, float, float]]:
     """One row per model: (family, log10_params, mean_pcorr)."""
-    models = load_all_models()
+    models = load_all_models(scope=scope)
     rows = []
     for _label, m in models.items():
         mean = m["partial_corr"].get("mean")
@@ -349,9 +422,9 @@ def load_model_means() -> list[tuple[str, float, float]]:
     return rows
 
 
-def load_control_sensitivity() -> list[dict[str, Any]]:
+def load_control_sensitivity(scope: str | None = None) -> list[dict[str, Any]]:
     """Models with control sensitivity data for the waterfall plot."""
-    models = load_all_models()
+    models = load_all_models(scope=scope)
     results = []
     for label, m in models.items():
         cs = m.get("control_sensitivity", {})
@@ -364,7 +437,13 @@ def load_control_sensitivity() -> list[dict[str, Any]]:
                 "params_b": m["params_b"],
                 **{
                     k: cs[k]
-                    for k in ["none", "softmax_only", "standard", "plus_entropy", "nonlinear"]
+                    for k in [
+                        "none",
+                        "softmax_only",
+                        "standard",
+                        "plus_entropy",
+                        "nonlinear",
+                    ]
                     if k in cs
                 },
             }
@@ -372,9 +451,11 @@ def load_control_sensitivity() -> list[dict[str, Any]]:
     return results
 
 
-def load_random_head_baselines() -> list[tuple[str, str, float, float]]:
+def load_random_head_baselines(
+    scope: str | None = None,
+) -> list[tuple[str, str, float, float]]:
     """Random-probe baseline: (label, family, params_b, value)."""
-    models = load_all_models()
+    models = load_all_models(scope=scope)
     results = []
     for label, m in models.items():
         rh = m.get("baselines", {}).get("random_head")
@@ -396,9 +477,6 @@ def validate_all(strict: bool = False) -> int:
     total_warnings = 0
     for fname, family in all_files:
         path = RESULTS_DIR / fname
-        fallback = QWEN_FALLBACKS.get(fname)
-        if not path.exists() and fallback:
-            path = RESULTS_DIR / fallback
         if not path.exists():
             print(f"  MISSING: {fname} ({family})")
             total_warnings += 1
@@ -430,12 +508,107 @@ def validate_all(strict: bool = False) -> int:
     return total_warnings
 
 
+CANONICAL_PROVENANCE_FIELDS = ("model_revision", "script", "timestamp", "value_source", "device")
+CANONICAL_VALUE_SOURCE = {"runtime", "post_hoc_deterministic"}
+# Paper-cited committed results are 100% CUDA. MPS and CPU runs are for
+# local development only and do not ship.
+CANONICAL_DEVICE = {"cuda"}
+NON_RESULT_FILES = {
+    "model_revisions.json",  # HF model revision registry, not a result
+    "dataset_revisions.json",  # HF dataset revision registry, not a result
+}
+
+
+def _validate_one_provenance(prov: Any, label: str = "<test>") -> list[str]:
+    """Validate a single provenance dict against the canonical contract.
+
+    Returns a list of error messages (empty if valid). Pure function so
+    mutation tests can call it directly without writing files.
+    """
+    errors: list[str] = []
+    if not isinstance(prov, dict):
+        return [f"{label}: missing provenance dict"]
+
+    missing = [k for k in CANONICAL_PROVENANCE_FIELDS if k not in prov]
+    if missing:
+        errors.append(f"{label}: missing fields: {missing}")
+        return errors  # downstream checks assume required keys present
+
+    extras = set(prov.keys()) - set(CANONICAL_PROVENANCE_FIELDS)
+    if extras:
+        errors.append(f"{label}: extra fields not allowed: {sorted(extras)}")
+
+    if tuple(prov.keys()) != CANONICAL_PROVENANCE_FIELDS:
+        errors.append(f"{label}: field order {tuple(prov.keys())} != canonical")
+
+    ts = prov["timestamp"]
+    if not (isinstance(ts, str) and len(ts) == 25 and ts.endswith("+00:00") and "." not in ts):
+        errors.append(f"{label}: timestamp not UTC second-precision: {ts!r}")
+
+    rev = prov["model_revision"]
+    if not (isinstance(rev, str) and (len(rev) == 40 or rev == "multi")):
+        errors.append(f"{label}: model_revision not 40-char SHA / 'multi': {rev!r}")
+
+    if prov["value_source"] not in CANONICAL_VALUE_SOURCE:
+        errors.append(f"{label}: value_source not in enum: {prov['value_source']!r}")
+
+    if prov["device"] not in CANONICAL_DEVICE:
+        errors.append(f"{label}: device not in {CANONICAL_DEVICE}: {prov['device']!r}")
+
+    script = prov["script"]
+    if not isinstance(script, str) or not script:
+        errors.append(f"{label}: script must be a non-empty string: {script!r}")
+    elif not (script.startswith("scripts/") or script.startswith("src/")):
+        errors.append(f"{label}: script must be under scripts/ or src/: {script!r}")
+    elif not (REPO_ROOT / script).is_file():
+        errors.append(f"{label}: script does not point at an existing file: {script!r}")
+
+    return errors
+
+
+def validate_canonical_provenance() -> int:
+    """Scan every result JSON for canonical provenance shape.
+
+    Complements validate_all(): the per-file-type schema checks above
+    cover paper-cited probe runs only. This pass runs on every JSON in
+    results/ and tests/fixtures/ and verifies the canonical 5-field
+    provenance block shape regardless of file type. Returns warning count.
+    """
+    warnings = 0
+    files: list[Path] = []
+    for d in (RESULTS_DIR, FIXTURES_DIR):
+        if d.exists():
+            files.extend(sorted(d.glob("*.json")))
+    scanned = 0
+    for path in files:
+        if path.name in NON_RESULT_FILES:
+            continue
+        try:
+            data = json.loads(path.read_text())
+        except json.JSONDecodeError as e:
+            print(f"  CANONICAL FAIL: {path.name} JSON decode error: {e}")
+            warnings += 1
+            continue
+        if not isinstance(data, dict):
+            continue
+        scanned += 1
+        for msg in _validate_one_provenance(data.get("provenance"), path.name):
+            print(f"  CANONICAL FAIL: {msg}")
+            warnings += 1
+
+    if warnings == 0:
+        print(f"  Canonical provenance: {scanned} files all conform")
+    return warnings
+
+
 if __name__ == "__main__":
     import sys
 
     strict = "--strict" in sys.argv
     print(f"Validating results JSONs {'(strict)' if strict else ''}...\n")
     n = validate_all(strict=strict)
+    print()
+    n += validate_canonical_provenance()
     if n:
         print(f"\n{n} warning(s)")
         sys.exit(1)

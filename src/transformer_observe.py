@@ -25,7 +25,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
+import json
 import time
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -40,6 +43,44 @@ from probe import (
     train_linear_binary,
 )
 from utils import _save_results, bootstrap_ci
+
+
+def _revision_kwargs(model_id):
+    """Look up the pinned HF commit from results/model_revisions.json.
+
+    Returns kwargs suitable for splatting into ``from_pretrained(...)``.
+    Empty dict if the manifest is absent or the model isn't listed; the
+    caller falls back to loading the latest main, and provenance still
+    captures the resolved SHA via ``model.config._commit_hash``.
+    """
+    manifest = Path(__file__).resolve().parent.parent / "results" / "model_revisions.json"
+    if not manifest.exists():
+        return {}
+    commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+    return {"revision": commit} if commit else {}
+
+
+def _require_revision(rev_kw, model_config, model_id):
+    """Resolve and validate the HF commit for provenance. Raise if missing."""
+    rev = rev_kw.get("revision") or getattr(model_config, "_commit_hash", None)
+    if not rev:
+        raise RuntimeError(
+            f"Could not resolve model revision for {model_id}: pin via results/model_revisions.json "
+            "or upgrade transformers (model.config._commit_hash unset)."
+        )
+    return rev
+
+
+def _build_provenance(model_revision, device):
+    """Canonical 5-key provenance block."""
+    return {
+        "model_revision": model_revision,
+        "script": "src/transformer_observe.py",
+        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+        "value_source": "runtime",
+        "device": str(device),
+    }
+
 
 # ---------------------------------------------------------------------------
 # Architecture-agnostic helpers
@@ -2881,8 +2922,9 @@ def run_scale(
 
         # Load model
         print(f"  Loading {model_id}...")
-        tokenizer = GPT2TokenizerFast.from_pretrained(model_id)
-        model = GPT2LMHeadModel.from_pretrained(model_id).to(device)
+        _rev_kw = _revision_kwargs(model_id)
+        tokenizer = GPT2TokenizerFast.from_pretrained(model_id, **_rev_kw)
+        model = GPT2LMHeadModel.from_pretrained(model_id, **_rev_kw).to(device)
         model.eval()
 
         n_layers = model.config.num_hidden_layers
@@ -3140,12 +3182,13 @@ def run_cross_family(
         print(f"{'=' * 60}")
 
         print(f"  Loading {model_id}...")
-        tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+        _rev_kw = _revision_kwargs(model_id)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True, **_rev_kw)
         # Use float16 for faster inference on MPS/CUDA; probes train in float32 on CPU tensors
         dtype = torch.float16 if device in ("mps", "cuda") else torch.float32
-        model = AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=True, torch_dtype=dtype).to(
-            device
-        )
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id, trust_remote_code=True, dtype=dtype, **_rev_kw
+        ).to(device)
         model.eval()
 
         n_layers = model.config.num_hidden_layers
@@ -3381,7 +3424,7 @@ def run_cross_family(
 def main():
     P = argparse.ArgumentParser()
     P.add_argument("--seeds", type=int, default=3, help="Number of observer head seeds")
-    P.add_argument("--device", default="auto")
+    P.add_argument("--device", default="cuda", choices=["cuda"])
     P.add_argument("--max-tokens-train", type=int, default=200000)
     P.add_argument("--max-tokens-val", type=int, default=100000)
     P.add_argument("--max-tokens-test", type=int, default=100000)
@@ -3420,9 +3463,27 @@ def main():
     P.add_argument("--cross-domain", action="store_true", help="Cross-domain transfer test")
     P.add_argument("--scale", "--phase8", action="store_true", help="Scaling across GPT-2 family")
     P.add_argument("--model", default="gpt2", help="Model for single-model scaling run")
-    P.add_argument("--phase9a", action="store_true", help="Cross-family test: Llama 3.2 1B")
-    P.add_argument("--phase9b", action="store_true", help="Cross-family test: Qwen 2.5 0.5B and 1.5B")
-    P.add_argument("--phase9", action="store_true", help="All cross-family experiments (9a and 9b)")
+    P.add_argument(
+        "--cross-family-llama",
+        "--phase9a",
+        action="store_true",
+        dest="phase9a",
+        help="Cross-family test: Llama 3.2 1B",
+    )
+    P.add_argument(
+        "--cross-family-qwen",
+        "--phase9b",
+        action="store_true",
+        dest="phase9b",
+        help="Cross-family test: Qwen 2.5 0.5B and 1.5B",
+    )
+    P.add_argument(
+        "--cross-family-all",
+        "--phase9",
+        action="store_true",
+        dest="phase9",
+        help="All cross-family experiments",
+    )
     P.add_argument(
         "--mechanistic-7b",
         action="store_true",
@@ -3430,9 +3491,12 @@ def main():
     )
     a = P.parse_args()
 
-    if a.device == "auto":
-        a.device = (
-            "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+    if not torch.cuda.is_available():
+        import sys
+
+        sys.exit(
+            "transformer_observe.py produces paper-quality results and requires CUDA. "
+            "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
         )
 
     seeds = list(range(42, 42 + a.seeds))
@@ -3472,6 +3536,7 @@ def main():
         )
         elapsed = time.time() - t0
         print(f"\nTotal time: {elapsed:.0f}s")
+        results["provenance"] = _build_provenance("multi", a.device)
         _save_results(results)
         return
 
@@ -3503,6 +3568,7 @@ def main():
             )
         elapsed = time.time() - t0
         print(f"\nTotal time: {elapsed:.0f}s")
+        results["provenance"] = _build_provenance("multi", a.device)
         _save_results(results, filename="cross_family.json")
         return
 
@@ -3514,14 +3580,16 @@ def main():
 
         model_id = "Qwen/Qwen2.5-7B"
         print(f"\nLoading {model_id} for mechanistic analysis...")
-        tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+        _rev_kw = _revision_kwargs(model_id)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True, **_rev_kw)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         dtype = torch.float16 if a.device in ("mps", "cuda") else torch.float32
         model = AutoModelForCausalLM.from_pretrained(
             model_id,
             trust_remote_code=True,
-            torch_dtype=dtype,
+            dtype=dtype,
+            **_rev_kw,
         ).to(a.device)
         model.eval()
 
@@ -3552,9 +3620,13 @@ def main():
         mech_result["n_layers"] = n_layers
         mech_result["hidden_dim"] = hidden_dim
 
+        provenance = _build_provenance(_require_revision(_rev_kw, model.config, model_id), a.device)
         elapsed = time.time() - t0
         print(f"\nTotal time: {elapsed:.0f}s")
-        _save_results({"mechanistic_7b": mech_result}, filename="mechanistic_7b.json")
+        _save_results(
+            {"mechanistic_7b": mech_result, "provenance": provenance},
+            filename="mechanistic_7b.json",
+        )
 
         del model, tokenizer
         gc.collect()
@@ -3566,8 +3638,9 @@ def main():
     from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
     print("\nLoading GPT-2 124M...")
-    tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
-    model = GPT2LMHeadModel.from_pretrained("gpt2").to(a.device)
+    _rev_kw = _revision_kwargs("openai-community/gpt2")
+    tokenizer = GPT2TokenizerFast.from_pretrained("openai-community/gpt2", **_rev_kw)
+    model = GPT2LMHeadModel.from_pretrained("openai-community/gpt2", **_rev_kw).to(a.device)
     model.eval()
     print(f"  {sum(p.numel() for p in model.parameters()) / 1e6:.0f}M parameters")
 
@@ -3684,6 +3757,9 @@ def main():
     elapsed = time.time() - t0
     print(f"\nTotal time: {elapsed:.0f}s")
 
+    results["provenance"] = _build_provenance(
+        _require_revision(_rev_kw, model.config, "openai-community/gpt2"), a.device
+    )
     _save_results(results)
 
 

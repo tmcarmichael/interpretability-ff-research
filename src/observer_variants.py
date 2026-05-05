@@ -215,7 +215,7 @@ def run_variant(
 
 
 def main():
-    device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     seeds = [42, 43, 44]
     hidden = 500
     layers = 4

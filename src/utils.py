@@ -16,9 +16,12 @@ RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 def _deep_merge(base: dict, update: dict) -> dict:
     """Recursively merge `update` into `base`, preserving nested keys.
 
-    Prevents partial reruns from nuking sibling results. Rerunning a single
-    model in the scaling sweep merges into the existing models dict rather
-    than replacing the entire key.
+    Contract on collision: nested dicts merge recursively; non-dict leaves in
+    `update` silently overwrite the corresponding leaf in `base`. Keys present
+    only in `base` are preserved. Callers can do partial reruns without nuking
+    sibling results, but stale leaves in `base` persist silently when `update`
+    omits a key the caller intended to refresh. To guarantee freshness, write
+    a complete dict (or delete the file before save).
     """
     for key, value in update.items():
         if key in base and isinstance(base[key], dict) and isinstance(value, dict):

@@ -1,0 +1,31 @@
+{
+  "description": "Hugging Face dataset IDs, configs, URLs, and commit hashes for all paper-cited eval data. Producer scripts pin via the revision= argument to load_dataset.",
+  "retrieved": "2026-05-03",
+  "datasets": {
+    "Salesforce/wikitext": {
+      "config": "wikitext-103-raw-v1",
+      "url": "https://huggingface.co/datasets/Salesforce/wikitext",
+      "commit": "b08601e04326c79dfdd32d625aee71d232d685c3"
+    },
+    "allenai/c4": {
+      "config": "en",
+      "url": "https://huggingface.co/datasets/allenai/c4",
+      "commit": "1588ec454efa1a09f29cd18ddd04fe05fc8653a2"
+    },
+    "rajpurkar/squad_v2": {
+      "config": null,
+      "url": "https://huggingface.co/datasets/rajpurkar/squad_v2",
+      "commit": "3ffb306f725f7d2ce8394bc1873b24868140c412"
+    },
+    "GBaker/MedQA-USMLE-4-options": {
+      "config": null,
+      "url": "https://huggingface.co/datasets/GBaker/MedQA-USMLE-4-options",
+      "commit": "0fb93dd23a7339b6dcd27e241cb9b5eca62d4d18"
+    },
+    "truthfulqa/truthful_qa": {
+      "config": "multiple_choice",
+      "url": "https://huggingface.co/datasets/truthfulqa/truthful_qa",
+      "commit": "741b8276f2d1982aa3d5b832d3ee81ed3b896490"
+    }
+  }
+}

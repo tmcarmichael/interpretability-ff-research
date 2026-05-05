@@ -1,0 +1,206 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05T04:48:46+00:00",
+  "generated_from_repo": "paper-adot",
+  "generated_from": "export_figure_sources.py",
+  "source": "figure_provenance.json",
+  "n_figures": 8,
+  "figures": {
+    "cross_family_scaling.pdf": {
+      "generated_from": "figures/fig_cross_family.py",
+      "source_files": [
+        "gpt2-124m_main.json",
+        "gpt2-medium_main.json",
+        "gpt2-large_main.json",
+        "gpt2-xl_main.json",
+        "qwen2.5-0.5b_main.json",
+        "qwen2.5-1.5b_main.json",
+        "qwen2.5-3b_main.json",
+        "qwen2.5-7b_main.json",
+        "qwen2.5-14b_main.json",
+        "qwen2.5-32b_main.json",
+        "llama-3.2-1b_main.json",
+        "llama-3.2-3b_main.json",
+        "llama-3.1-8b_main.json",
+        "gemma-3-1b_main.json",
+        "gemma-3-4b_main.json",
+        "mistral-7b-v0.3_main.json",
+        "phi-3-mini_main.json"
+      ],
+      "n_source_files": 17,
+      "key_paths": [
+        "partial_corr.mean",
+        "partial_corr.per_seed",
+        "n_params_b",
+        "family"
+      ],
+      "description": "Partial correlation vs parameter count across six families. One point per model.",
+      "paper_section": "sec:architecture",
+      "label": "fig:cross_family",
+      "alt_text_file": "cross_family_scaling.alt.txt",
+      "scope": "cross_family_17"
+    },
+    "control_sensitivity_waterfall.pdf": {
+      "generated_from": "figures/fig_waterfall.py",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "n_source_files": 1,
+      "key_paths": [
+        "control_sensitivity.none",
+        "control_sensitivity.softmax_only",
+        "control_sensitivity.standard",
+        "control_sensitivity.plus_entropy",
+        "control_sensitivity.nonlinear"
+      ],
+      "description": "Control-sensitivity waterfall for GPT-2 124M: raw Spearman, softmax-only, standard (softmax+norm), +entropy, nonlinear MLP.",
+      "paper_section": "sec:signal",
+      "label": "fig:waterfall",
+      "alt_text_file": "control_sensitivity_waterfall.alt.txt"
+    },
+    "exdim_sensitivity.pdf": {
+      "generated_from": "figures/fig_exdim.py",
+      "source_files": [
+        "qwen2.5-0.5b_exdim-sweep.json",
+        "qwen2.5-0.5b_main.json",
+        "qwen2.5-0.5b_exdim-1000.json"
+      ],
+      "n_source_files": 3,
+      "key_paths": [
+        "partial_corr.mean",
+        "protocol.target_ex_per_dim"
+      ],
+      "description": "Partial correlation as a function of token budget per hidden dimension on Qwen 2.5 0.5B; the 350 ex/dim canonical protocol point and the 1000 ex/dim saturation reference.",
+      "paper_section": "sec:appendix_token_budget",
+      "label": "fig:exdim",
+      "alt_text_file": "exdim_sensitivity.alt.txt"
+    },
+    "oc_vs_pcorr.pdf": {
+      "generated_from": "figures/fig_oc_vs_pcorr.py",
+      "source_files": [
+        "gpt2-124m_main.json",
+        "gpt2-medium_main.json",
+        "gpt2-large_main.json",
+        "gpt2-xl_main.json",
+        "qwen2.5-0.5b_main.json",
+        "qwen2.5-1.5b_main.json",
+        "qwen2.5-3b_main.json",
+        "qwen2.5-7b_main.json",
+        "qwen2.5-14b_main.json",
+        "qwen2.5-32b_main.json",
+        "llama-3.2-1b_main.json",
+        "llama-3.2-3b_main.json",
+        "llama-3.1-8b_main.json",
+        "gemma-3-1b_main.json",
+        "gemma-3-4b_main.json",
+        "mistral-7b-v0.3_main.json",
+        "phi-3-mini_main.json",
+        "pythia-70m_main.json",
+        "pythia-160m_main.json",
+        "pythia-410m_main.json",
+        "pythia-1b_main.json",
+        "pythia-1.4b_main.json",
+        "pythia-2.8b_main.json",
+        "pythia-6.9b_main.json",
+        "pythia-12b_main.json"
+      ],
+      "n_source_files": 25,
+      "key_paths": [
+        "partial_corr.mean",
+        "output_controlled.mean"
+      ],
+      "description": "Output-controlled residual vs confidence-controlled partial correlation across cross-family and Pythia models. Bootstrap linear fit on healthy cluster.",
+      "paper_section": "sec:signal",
+      "label": "fig:oc_vs_pcorr",
+      "alt_text_file": "oc_vs_pcorr.alt.txt"
+    },
+    "pythia_layers.pdf": {
+      "generated_from": "figures/fig_pythia_layers.py",
+      "source_files": [
+        "pythia-70m_main.json",
+        "pythia-160m_main.json",
+        "pythia-410m_main.json",
+        "pythia-1b_main.json",
+        "pythia-1.4b_main.json",
+        "pythia-2.8b_main.json",
+        "pythia-6.9b_main.json",
+        "pythia-12b_main.json"
+      ],
+      "n_source_files": 8,
+      "key_paths": [
+        "layer_profile"
+      ],
+      "description": "Per-layer pcorr trajectories for the 8 Pythia controlled-suite configurations. Highlights the (24L, 16H) collapsed configurations (410M, 1.4B).",
+      "paper_section": "sec:pythia",
+      "label": "fig:pythia_layers",
+      "alt_text_file": "pythia_layers.alt.txt",
+      "scope": "pythia_controlled_8"
+    },
+    "downstream_three_model.pdf": {
+      "generated_from": "figures/fig_downstream_three_model.py",
+      "source_files": [
+        "qwen2.5-7b-instruct_squad-rag.json",
+        "mistral-7b-instruct-v0.3_squad-rag.json",
+        "phi-3-mini_squad-rag.json",
+        "qwen2.5-7b-instruct_medqa.json",
+        "mistral-7b-instruct-v0.3_medqa.json",
+        "phi-3-mini_medqa.json",
+        "qwen2.5-7b-instruct_truthfulqa.json",
+        "mistral-7b-instruct-v0.3_truthfulqa.json",
+        "phi-3-mini_truthfulqa.json"
+      ],
+      "n_source_files": 9,
+      "key_paths": [
+        "flag_rates",
+        "standard_catches"
+      ],
+      "description": "Downstream observability transfer (3 models x 3 tasks): flag rates on SQuAD-RAG and MedQA, standard catches on TruthfulQA.",
+      "paper_section": "sec:appendix_downstream",
+      "label": "fig:downstream",
+      "alt_text_file": "downstream_three_model.alt.txt",
+      "scope": "downstream_3x3"
+    },
+    "within_family_cliff.pdf": {
+      "generated_from": "figures/fig_within_family_cliff.py",
+      "source_files": [
+        "llama-3.2-1b_main.json",
+        "llama-3.2-3b_main.json",
+        "llama-3.1-8b_main.json",
+        "pythia-70m_main.json",
+        "pythia-160m_main.json",
+        "pythia-410m_main.json",
+        "pythia-1b_main.json",
+        "pythia-1.4b_main.json",
+        "pythia-2.8b_main.json",
+        "pythia-6.9b_main.json",
+        "pythia-12b_main.json"
+      ],
+      "n_source_files": 11,
+      "key_paths": [
+        "layer_profile"
+      ],
+      "description": "Two-panel per-layer pcorr trajectories showing the within-family cliff: Llama family (left) and Pythia controlled suite (right). Same protocol, same shaded detection band.",
+      "paper_section": "sec:architecture",
+      "label": "fig:within_family_cliff",
+      "alt_text_file": "within_family_cliff.alt.txt"
+    },
+    "checkpoint_dynamics.pdf": {
+      "generated_from": "figures/fig_checkpoint_dynamics.py",
+      "source_files": [
+        "pythia-1b_dynamics.json",
+        "pythia-1.4b_dynamics.json"
+      ],
+      "n_source_files": 2,
+      "key_paths": [
+        "checkpoints.partial_corr.mean",
+        "checkpoints.output_controlled.mean",
+        "checkpoints.tokens_seen",
+        "checkpoints.step"
+      ],
+      "description": "Two-panel observability trajectories during Pythia training. Top: rho_partial vs tokens for Pythia 1B (16L/8H, healthy) and 1.4B (24L/16H, collapsed). Bottom: r_OC over the same checkpoints.",
+      "paper_section": "sec:pythia",
+      "label": "fig:checkpoint_dynamics",
+      "alt_text_file": "checkpoint_dynamics.alt.txt"
+    }
+  }
+}

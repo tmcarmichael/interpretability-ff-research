@@ -128,9 +128,9 @@ def test_get_layer_list_covers_cross_family(script_path):
 
 @pytest.mark.parametrize("script_path", DOWNSTREAM_SCRIPTS, ids=lambda p: p.name)
 def test_get_layer_list_phi3_and_mistral_share_qwen_case(script_path):
-    # Phi-3 and Mistral both expose .model.layers (confirmed by AutoConfig inspection,
-    # see scripts/preflight/check_architecture.py). Verify the Qwen-shaped fixture
-    # works, which is sufficient because the resolution path is identical.
+    # Phi-3 and Mistral both expose .model.layers (confirmed by AutoConfig
+    # inspection). Verify the Qwen-shaped fixture works, which is sufficient
+    # because the resolution path is identical.
     fn = _compile_function(_extract_function(script_path, "_get_layer_list"), "_get_layer_list")
     phi3_shaped = _qwen_like()
     phi3_shaped.model.layers = nn.ModuleList([nn.Linear(8, 8) for _ in range(32)])
@@ -199,6 +199,27 @@ def test_train_linear_binary_deterministic():
     np.testing.assert_array_equal(w1, w2, err_msg="train_linear_binary not deterministic under fixed seed")
 
 
+def test_rag_analysis_reads_only_recorded_keys():
+    """The RAG analysis section reads r["..."] from records appended in the
+    per-question loop. Every key read must have been written by the loop.
+    Catches the em_correct KeyError class of bug at lint time."""
+    import re
+
+    src = (REPO_ROOT / "scripts" / "rag_hallucination.py").read_text()
+    # Keys written into a record dict appended to all_results.
+    written = set(re.findall(r"all_results\.append\([^)]*?\{([^}]*)\}", src, flags=re.DOTALL))
+    assert written, "Could not locate all_results.append({...}) block"
+    keys_written = set(re.findall(r'"([a-zA-Z_][a-zA-Z0-9_]*)"\s*:', written.pop()))
+    # Keys read via r["..."] in any list comprehension over all_results.
+    keys_read = set(re.findall(r'\bfor\s+r\s+in\s+all_results\b[\s\S]{0,80}?r\[\s*"([^"]+)"\s*\]', src))
+    keys_read |= set(re.findall(r'r\[\s*"([^"]+)"\s*\]\s+for\s+r\s+in\s+all_results', src))
+    missing = keys_read - keys_written
+    assert not missing, (
+        f"rag_hallucination.py reads keys {missing} from all_results that are never written. "
+        f"Written keys: {keys_written}"
+    )
+
+
 EXPECTED_DATASETS = {
     "medqa_selective.py": "GBaker/MedQA-USMLE-4-options",
     "rag_hallucination.py": "rajpurkar/squad_v2",
@@ -218,7 +239,7 @@ def test_loader_dataset_matches_output_label(script_path):
 
     src = script_path.read_text()
     loader_matches = re.findall(r'load_dataset\(\s*"([^"]+)"', src)
-    loader_datasets = [m for m in loader_matches if m != "wikitext"]
+    loader_datasets = [m for m in loader_matches if m not in {"wikitext", "Salesforce/wikitext"}]
     output_matches = re.findall(r'"dataset"\s*:\s*"([^"]+)"', src)
 
     assert loader_datasets, f"No task-dataset load_dataset call found in {script_path.name}"

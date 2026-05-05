@@ -12,6 +12,7 @@ import gc
 import json
 import shutil
 import subprocess
+import sys
 import time
 from glob import glob
 from pathlib import Path
@@ -20,6 +21,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from scipy.stats import pearsonr, rankdata, spearmanr
+
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
 
 # ── Core numerics (bit-identical to run_model.py) ────────────────────
 
@@ -43,7 +46,13 @@ def compute_loss_residuals(losses, max_softmax, activation_norm):
 def load_wikitext(split="test", max_docs=None):
     from datasets import load_dataset
 
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split, streaming=bool(max_docs))
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+        streaming=bool(max_docs),
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -214,9 +223,13 @@ def collect_multi_layer_stream(
         with torch.inference_mode():
             outputs = model(input_ids, attention_mask=attn_mask, use_cache=False)
 
+        # Under device_map="auto", outputs.logits and hooked layer outputs may
+        # live on a different GPU than the inputs. Cast shift_mask/shift_labels
+        # to each consumer's device before indexing.
         shift_mask = attn_mask[:, 1:].bool()
         shift_logits = outputs.logits[:, :-1, :].contiguous()
-        shift_labels = input_ids[:, 1:].contiguous()
+        shift_labels = input_ids[:, 1:].to(shift_logits.device).contiguous()
+        shift_mask_logits = shift_mask.to(shift_logits.device)
         V = shift_logits.size(-1)
 
         losses_2d = F.cross_entropy(shift_logits.view(-1, V), shift_labels.view(-1), reduction="none").view(
@@ -231,14 +244,15 @@ def collect_multi_layer_stream(
             ent_2d[ci : ci + sm_chunk] = -(p * (p + 1e-10).log()).sum(dim=-1)
             del p
 
-        batch_losses = losses_2d[shift_mask].float().cpu().numpy()
-        batch_sm = sm_2d[shift_mask].float().cpu().numpy()
-        batch_ent = ent_2d[shift_mask].float().cpu().numpy()
+        batch_losses = losses_2d[shift_mask_logits].float().cpu().numpy()
+        batch_sm = sm_2d[shift_mask_logits].float().cpu().numpy()
+        batch_ent = ent_2d[shift_mask_logits].float().cpu().numpy()
 
         for l in layers:
             h = captured[l][:, :-1, :]  # bf16
-            acts = h[shift_mask].to(torch.bfloat16).contiguous().cpu()
-            norms = h.float().norm(dim=-1)[shift_mask].cpu().numpy()
+            shift_mask_h = shift_mask.to(h.device)
+            acts = h[shift_mask_h].to(torch.bfloat16).contiguous().cpu()
+            norms = h.float().norm(dim=-1)[shift_mask_h].cpu().numpy()
             # activations only per batch; scalars accumulated for meta.pt
             torch.save({"activations": acts}, shard_dirs[l] / f"acts_{batch_idx:06d}.pt")
             per_layer_losses[l].append(batch_losses)
@@ -304,7 +318,7 @@ def collect_multi_layer_stream(
 
 
 def train_linear_binary_streaming(shard_dir, seed, epochs=20, lr=1e-3, mb_size=4096):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda"
     meta = load_meta(shard_dir)
     residuals = compute_loss_residuals(meta["losses"], meta["max_softmax"], meta["activation_norm"])
     all_targets = (residuals > 0).astype(np.float32)
@@ -486,7 +500,7 @@ parser.add_argument("--skip-c4", action="store_true")
 parser.add_argument("--max-docs", type=int, default=None)
 parser.add_argument("--shard-root", default="/workspace/shards")
 parser.add_argument("--keep-shards", action="store_true")
-parser.add_argument("--peak-layer", type=int, default=None, help="skip Phase 1; use this layer as peak")
+parser.add_argument("--peak-layer", type=int, default=None, help="skip layer sweep; use this layer as peak")
 parser.add_argument("--candidates-per-pass", type=int, default=None)
 parser.add_argument(
     "--device-map",
@@ -506,13 +520,26 @@ parser.add_argument(
 )
 parser.add_argument("--force-restart", action="store_true", help="ignore checkpoint, start from scratch")
 parser.add_argument(
-    "--gpu-resident-phase5",
+    "--gpu-resident-cache",
     action="store_true",
     default=True,
     help="load peak-layer activations to GPU after model unload (default true)",
 )
-parser.add_argument("--no-gpu-resident-phase5", dest="gpu_resident_phase5", action="store_false")
+parser.add_argument("--no-gpu-resident-cache", dest="gpu_resident_cache", action="store_false")
 args = parser.parse_args()
+
+# Fail-fast before model download.
+if not RESULTS_DIR.is_dir():
+    sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+manifest = RESULTS_DIR / "model_revisions.json"
+if not manifest.is_file():
+    sys.exit(f"Manifest missing: {manifest}")
+if args.model not in json.loads(manifest.read_text()).get("models", {}):
+    sys.exit(f"Model {args.model!r} not in manifest")
+ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+if not ds_manifest.is_file():
+    sys.exit(f"Dataset manifest missing: {ds_manifest}")
+DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
 
 
 # ── Setup ────────────────────────────────────────────────────────────
@@ -521,7 +548,12 @@ args = parser.parse_args()
 if shutil.which("nvidia-smi"):
     subprocess.run(["nvidia-smi"], check=False)
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+if not torch.cuda.is_available():
+    sys.exit(
+        "run_stream_model.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
 TRAIN_DEVICE = DEVICE
 SM_CHUNK = 8
 print(f"Device: {DEVICE}")
@@ -540,27 +572,45 @@ def elapsed_str():
     return f"{m:.0f}m" if m < 60 else f"{m / 60:.1f}h"
 
 
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    if p.is_absolute():
+        return p
+    base = (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+    return base / p
+
+
 MODEL_ID = args.model
 BATCH_SIZE = args.batch_size
 LAYERS_PER_PASS = args.layers_per_pass
 TARGET_EX_PER_DIM = args.ex_dim
-model_slug = args.output.replace("_results.json", "").replace(".json", "")
+model_slug = Path(args.output).name.replace("_results.json", "").replace(".json", "")
 SHARD_ROOT = Path(args.shard_root) / model_slug
 SHARD_ROOT.mkdir(parents=True, exist_ok=True)
-CHECKPOINT_PATH = Path(f"/workspace/{model_slug}_checkpoint.json")
+OUT_PATH = _resolve_out(args.output)
+CHECKPOINT_PATH = _resolve_out(f"{model_slug}_checkpoint.json")
+OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+CHECKPOINT_PATH.parent.mkdir(parents=True, exist_ok=True)
 print(f"Shard root: {SHARD_ROOT}")
+print(f"Output:     {OUT_PATH}")
 print(f"Checkpoint: {CHECKPOINT_PATH}")
 
 
-def save_checkpoint(phase, **data):
-    ckpt = {"_checkpoint_phase": phase, "_elapsed": elapsed_str()}
+def save_checkpoint(stage, **data):
+    ckpt = {"_checkpoint_stage": stage, "_elapsed": elapsed_str()}
     ckpt.update(data)
     try:
         with open(CHECKPOINT_PATH, "w") as f:
             json.dump(ckpt, f, indent=2)
-        print(f"  [checkpoint saved: phase {phase}]")
-    except OSError:
-        pass
+        print(f"  [checkpoint saved: {stage}]")
+    except OSError as e:
+        # The startup mkdir ruled out persistent path errors. A failure
+        # here is transient (disk full, intermittent IO). Log and continue.
+        print(f"  [checkpoint write failed: {e!r}; continuing without resume capability]")
 
 
 # Load prior checkpoint if resume is possible
@@ -568,7 +618,7 @@ prior_ckpt = None
 if CHECKPOINT_PATH.exists() and not args.force_restart:
     try:
         prior_ckpt = json.load(open(CHECKPOINT_PATH))
-        print(f"[resume] found checkpoint at phase {prior_ckpt.get('_checkpoint_phase')}")
+        print(f"[resume] found checkpoint at stage {prior_ckpt.get('_checkpoint_stage')}")
     except (json.JSONDecodeError, OSError):
         prior_ckpt = None
 
@@ -578,11 +628,22 @@ if CHECKPOINT_PATH.exists() and not args.force_restart:
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-load_kwargs = {"dtype": torch.bfloat16, "attn_implementation": args.attn_impl}
+
+def _revision_kwargs(model_id):
+    manifest_path = Path(__file__).resolve().parent.parent / "results" / "model_revisions.json"
+    if not manifest_path.exists():
+        return {}
+    commit = json.loads(manifest_path.read_text()).get("models", {}).get(model_id, {}).get("commit")
+    return {"revision": commit} if commit else {}
+
+
+_rev_kw = _revision_kwargs(MODEL_ID)
+
+load_kwargs = {"dtype": torch.bfloat16, "attn_implementation": args.attn_impl, **_rev_kw}
 if args.trust_remote_code:
     load_kwargs["trust_remote_code"] = True
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=args.trust_remote_code)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=args.trust_remote_code, **_rev_kw)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -614,7 +675,12 @@ else:
     model = AutoModelForCausalLM.from_pretrained(MODEL_ID, **load_kwargs).to(DEVICE)
 model.eval()
 
-_model_revision = getattr(model.config, "_commit_hash", None) or "unknown"
+_model_revision = _rev_kw.get("revision") or getattr(model.config, "_commit_hash", None)
+if not _model_revision:
+    raise RuntimeError(
+        f"Could not resolve model revision for {MODEL_ID}: pin via results/model_revisions.json "
+        "or upgrade transformers (model.config._commit_hash unset)."
+    )
 _cfg = getattr(model.config, "text_config", model.config)
 N_LAYERS = _cfg.num_hidden_layers
 HIDDEN_DIM = _cfg.hidden_size
@@ -647,21 +713,21 @@ del wiki_train_docs, wiki_val_docs, wiki_test_docs, wiki_train_enc, wiki_val_enc
 gc.collect()
 
 
-# ── Phase 1: layer sweep ────────────────────────────────────────────
+# ── Layer sweep ─────────────────────────────────────────────────────
 
 
 layer_profile = {}
 peak_layer = None
 
 if args.peak_layer is not None:
-    print(f"\n=== Phase 1: skipped (peak layer {args.peak_layer} specified) [{elapsed_str()}] ===")
+    print(f"\n=== Sweep skipped (peak layer {args.peak_layer} specified) [{elapsed_str()}] ===")
     peak_layer = args.peak_layer
-elif prior_ckpt and prior_ckpt.get("_checkpoint_phase") in ("1_sweep", "3_multiseed"):
-    print(f"\n=== Phase 1: skipped (resume from checkpoint) [{elapsed_str()}] ===")
+elif prior_ckpt and prior_ckpt.get("_checkpoint_stage") in ("sweep_done", "multiseed_done"):
+    print(f"\n=== Sweep skipped (resume from checkpoint) [{elapsed_str()}] ===")
     layer_profile = {int(k): v for k, v in prior_ckpt.get("layer_profile", {}).items()}
     peak_layer = int(prior_ckpt.get("peak_layer", prior_ckpt.get("peak_layer_final")))
 else:
-    print(f"\n=== Phase 1: sweeping {N_LAYERS} layers, {LAYERS_PER_PASS}/pass [{elapsed_str()}] ===")
+    print(f"\n=== Sweeping {N_LAYERS} layers, {LAYERS_PER_PASS}/pass [{elapsed_str()}] ===")
     layer_chunks = [
         list(range(i, min(i + LAYERS_PER_PASS, N_LAYERS))) for i in range(0, N_LAYERS, LAYERS_PER_PASS)
     ]
@@ -678,7 +744,7 @@ else:
             _, rho, _ = evaluate_head_streaming(head, shard_dir_for(SHARD_ROOT, "val", layer))
             layer_profile[layer] = float(rho)
             print(f"    L{layer:>2}: {rho:+.4f}")
-        # Delete Phase 1 chunk shards; Phase 2 will re-collect only candidates
+        # Delete sweep chunk shards; the candidate-collection step re-fetches only candidates
         for layer in chunk:
             shutil.rmtree(shard_dir_for(SHARD_ROOT, "train", layer), ignore_errors=True)
             shutil.rmtree(shard_dir_for(SHARD_ROOT, "val", layer), ignore_errors=True)
@@ -710,7 +776,7 @@ else:
     candidates = [peak_layer]
 print(f"\nPeak: L{peak_layer}, candidates: {candidates}")
 save_checkpoint(
-    "1_sweep",
+    "sweep_done",
     model=MODEL_ID,
     n_layers=N_LAYERS,
     hidden_dim=HIDDEN_DIM,
@@ -720,10 +786,10 @@ save_checkpoint(
 )
 
 
-# ── Phase 2: candidates + output ────────────────────────────────────
+# ── Candidates + output ─────────────────────────────────────────────
 
 
-print(f"\n=== Phase 2: collecting candidates + output [{elapsed_str()}] ===")
+print(f"\n=== Collecting candidates + output [{elapsed_str()}] ===")
 cpp = args.candidates_per_pass or LAYERS_PER_PASS
 for i in range(0, len(candidates), cpp):
     cand_chunk = candidates[i : i + cpp]
@@ -738,16 +804,16 @@ print(f"  Output layer L{output_layer} val...")
 collect_multi_layer_stream(model, val_batches, [output_layer], MAX_TRAIN, DEVICE, SHARD_ROOT, "val")
 
 
-# ── Phase 3: multi-seed eval ────────────────────────────────────────
+# ── Multi-seed eval ─────────────────────────────────────────────────
 
 
-if prior_ckpt and prior_ckpt.get("_checkpoint_phase") == "3_multiseed":
-    print(f"\n=== Phase 3: skipped (resume from checkpoint) [{elapsed_str()}] ===")
+if prior_ckpt and prior_ckpt.get("_checkpoint_stage") == "multiseed_done":
+    print(f"\n=== Multi-seed eval skipped (resume from checkpoint) [{elapsed_str()}] ===")
     layer_eval = {int(k): v for k, v in prior_ckpt.get("multi_layer_eval", {}).items()}
     FINAL = int(prior_ckpt.get("peak_layer_final"))
     ev = layer_eval[FINAL]
 else:
-    print(f"\n=== Phase 3: multi-seed eval [{elapsed_str()}] ===")
+    print(f"\n=== Multi-seed eval [{elapsed_str()}] ===")
     layer_eval = {}
     for layer in candidates:
         seed_rhos, seed_scores = [], []
@@ -780,7 +846,7 @@ else:
             shutil.rmtree(shard_dir_for(SHARD_ROOT, "val", layer), ignore_errors=True)
 
     save_checkpoint(
-        "3_multiseed",
+        "multiseed_done",
         model=MODEL_ID,
         n_layers=N_LAYERS,
         hidden_dim=HIDDEN_DIM,
@@ -793,10 +859,10 @@ else:
     )
 
 
-# ── Phase 4: test + C4 ──────────────────────────────────────────────
+# ── Test + C4 ───────────────────────────────────────────────────────
 
 
-print(f"\n=== Phase 4: test + C4 at FINAL [{elapsed_str()}] ===")
+print(f"\n=== Test + C4 at FINAL [{elapsed_str()}] ===")
 collect_multi_layer_stream(model, test_batches, [FINAL], MAX_TRAIN, DEVICE, SHARD_ROOT, "test")
 
 if not args.skip_c4:
@@ -805,7 +871,13 @@ if not args.skip_c4:
 
     if not shard_is_complete(shard_dir_for(SHARD_ROOT, "c4_test", FINAL)):
         c4_docs_test = []
-        ds = load_dataset("allenai/c4", "en", split="validation", streaming=True)
+        ds = load_dataset(
+            "allenai/c4",
+            "en",
+            split="validation",
+            revision=DATASET_REVISIONS["allenai/c4"]["commit"],
+            streaming=True,
+        )
         for i, row in enumerate(ds):
             if i < 50000:
                 continue
@@ -822,7 +894,13 @@ if not args.skip_c4:
 
     if not shard_is_complete(shard_dir_for(SHARD_ROOT, "c4_train", FINAL)):
         c4_docs_train = []
-        ds2 = load_dataset("allenai/c4", "en", split="validation", streaming=True)
+        ds2 = load_dataset(
+            "allenai/c4",
+            "en",
+            split="validation",
+            revision=DATASET_REVISIONS["allenai/c4"]["commit"],
+            streaming=True,
+        )
         for row in ds2:
             text = row["text"].strip()
             if len(text) > 100:
@@ -845,10 +923,10 @@ if DEVICE == "cuda":
 print(f"Model unloaded. [{elapsed_str()}]")
 
 
-# ── Phase 5: full battery ───────────────────────────────────────────
+# ── Full battery ────────────────────────────────────────────────────
 
 
-print(f"\n=== Phase 5: full battery [{elapsed_str()}] ===")
+print(f"\n=== Full battery [{elapsed_str()}] ===")
 
 train_peak_dir = shard_dir_for(SHARD_ROOT, "train", FINAL)
 val_peak_dir = shard_dir_for(SHARD_ROOT, "val", FINAL)
@@ -856,7 +934,7 @@ test_peak_dir = shard_dir_for(SHARD_ROOT, "test", FINAL)
 train_output_dir = shard_dir_for(SHARD_ROOT, "train", output_layer)
 val_output_dir = shard_dir_for(SHARD_ROOT, "val", output_layer)
 
-if args.gpu_resident_phase5 and DEVICE == "cuda":
+if args.gpu_resident_cache and DEVICE == "cuda":
     print("  Loading peak-layer activations to GPU (fp32)...")
     train_peak_acts, train_peak_meta = load_peak_to_gpu(train_peak_dir, device="cuda:0")
     val_peak_acts, val_peak_meta = load_peak_to_gpu(val_peak_dir, device="cuda:0")
@@ -919,7 +997,7 @@ val_ent = val_meta["logit_entropy"]
 
 # Output-controlled (3 seeds)
 print("\n  Output-controlled:")
-OC_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+OC_DEVICE = "cuda"
 
 
 def train_output_mlp_streaming(seed, epochs=20, lr=1e-3, mb_size=1024):
@@ -1118,15 +1196,9 @@ output = {
     "provenance": {
         "model_revision": _model_revision,
         "script": "scripts/run_stream_model.py",
-        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(),
+        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+        "value_source": "runtime",
         "device": str(DEVICE),
-        "torch_version": torch.__version__,
-        "output_file": args.output,
-        "note": (
-            "Shard-based streaming collection (bf16 on disk). Protocol identical to "
-            f"run_model.py; only storage and placement differ. device_map={args.device_map}, "
-            f"gpu_resident_phase5={args.gpu_resident_phase5}."
-        ),
     },
     "protocol": {
         "layer_select_seed": LAYER_SELECT_SEED,
@@ -1136,7 +1208,7 @@ output = {
         "layers_per_pass": LAYERS_PER_PASS,
         "storage": "bf16_shards_on_disk",
         "device_map": args.device_map,
-        "gpu_resident_phase5": bool(args.gpu_resident_phase5 and DEVICE == "cuda"),
+        "gpu_resident_cache": bool(args.gpu_resident_cache and DEVICE == "cuda"),
     },
     "peak_layer_final": FINAL,
     "peak_layer_frac": round(FINAL / N_LAYERS, 2),
@@ -1158,15 +1230,9 @@ output = {
     "flagging_6a": {"n_tokens": nf, "summary": fs},
 }
 
-if Path("/workspace").exists():
-    out_path = Path(f"/workspace/{args.output}")
-else:
-    out_path = Path(__file__).resolve().parent.parent / "results" / args.output
-    out_path.parent.mkdir(exist_ok=True)
-
-with open(out_path, "w") as f:
+with open(OUT_PATH, "w") as f:
     json.dump(output, f, indent=2)
-print(f"Saved {out_path}")
+print(f"Saved {OUT_PATH}")
 print(f"FINAL: L{FINAL} = {ev['mean']:+.4f} +/- {ev['std']:.4f}")
 print(f"Output-controlled: {np.mean(ctrl_rhos):+.4f}")
 print(f"Total time: {elapsed_str()}")

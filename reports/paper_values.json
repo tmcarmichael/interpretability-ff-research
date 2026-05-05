@@ -1,0 +1,2710 @@
+{
+  "schema_version": "1.2",
+  "paper_version": "v4.0.0",
+  "generated_at": "2026-05-05T06:14:14+00:00",
+  "generated_from_repo": "paper-adot",
+  "generated_from": "export_paper_values.py",
+  "source": "data_macros.sty",
+  "provenance_sources": [
+    "macro_provenance.json (hand-curated)",
+    "macro_provenance_auto.json (AST-derived)"
+  ],
+  "n_macros": 270,
+  "n_macros_with_provenance": 118,
+  "n_provenance_hand": 50,
+  "n_provenance_auto_only": 68,
+  "macros": [
+    {
+      "name": "corepcorr",
+      "value": "0.288",
+      "description": "GPT-2~124M peak layer pcorr",
+      "section": "Core measurement (GPT-2~124M)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; 7-seed mean at peak layer (L8)"
+    },
+    {
+      "name": "coreoc",
+      "value": "0.140",
+      "description": "GPT-2~124M OC residual",
+      "section": "Core measurement (GPT-2~124M)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "output_controlled.mean"
+      ],
+      "formula": "direct read; output-controlled residual at peak layer"
+    },
+    {
+      "name": "corelayerzero",
+      "value": "0.16",
+      "description": "layer 0 pcorr",
+      "section": "Core measurement (GPT-2~124M)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "layer_profile.0"
+      ],
+      "formula": "direct read; layer-0 pcorr"
+    },
+    {
+      "name": "hardpcorr",
+      "value": "0.282",
+      "description": "20-seed mean",
+      "section": "Hardening (20-seed, GPT-2~124M layer 11)",
+      "provenance_source": "hand",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "hardening.mean_partial_corr"
+      ],
+      "formula": "20-seed hardening mean at GPT-2 124M layer 11"
+    },
+    {
+      "name": "hardstd",
+      "value": "0.001",
+      "description": "20-seed std",
+      "section": "Hardening (20-seed, GPT-2~124M layer 11)",
+      "provenance_source": "hand",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "hardening.std_partial_corr"
+      ],
+      "formula": "20-seed hardening std"
+    },
+    {
+      "name": "hardsagree",
+      "value": "0.993",
+      "description": "20-seed sagree",
+      "section": "Hardening (20-seed, GPT-2~124M layer 11)",
+      "provenance_source": "hand",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "hardening.seed_agreement"
+      ],
+      "formula": "mean of 20-seed pairwise Spearman seed-agreement values"
+    },
+    {
+      "name": "hardlo",
+      "value": "0.2817",
+      "description": "20-seed 95% CI lower",
+      "section": "Hardening (20-seed, GPT-2~124M layer 11)",
+      "provenance_source": "auto",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "hardening.partial_corr_ci_95.0"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "hardhi",
+      "value": "0.2827",
+      "description": "20-seed 95% CI upper",
+      "section": "Hardening (20-seed, GPT-2~124M layer 11)",
+      "provenance_source": "auto",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "hardening.partial_corr_ci_95.1"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "hardseedmin",
+      "value": "0.279",
+      "description": "20-seed per-seed min",
+      "section": "Hardening (20-seed, GPT-2~124M layer 11)"
+    },
+    {
+      "name": "hardseedmax",
+      "value": "0.284",
+      "description": "20-seed per-seed max",
+      "section": "Hardening (20-seed, GPT-2~124M layer 11)"
+    },
+    {
+      "name": "rawspearman",
+      "value": "0.514",
+      "description": "no controls",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.none"
+      ],
+      "formula": "direct read; raw Spearman, no controls"
+    },
+    {
+      "name": "softmaxonly",
+      "value": "0.289",
+      "description": "softmax only",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.softmax_only"
+      ],
+      "formula": "direct read; partial Spearman controlling for max softmax only"
+    },
+    {
+      "name": "stdcontrol",
+      "value": "0.289",
+      "description": "softmax + norm",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.standard"
+      ],
+      "formula": "direct read; partial Spearman controlling for max softmax + activation norm"
+    },
+    {
+      "name": "entropycontrol",
+      "value": "0.211",
+      "description": "+ logit entropy",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.plus_entropy"
+      ],
+      "formula": "direct read; standard control + logit entropy"
+    },
+    {
+      "name": "nonlincontrol",
+      "value": "0.319",
+      "description": "nonlinear MLP",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.nonlinear"
+      ],
+      "formula": "direct read; partial Spearman after nonlinear MLP control on [softmax, norm]"
+    },
+    {
+      "name": "qSevenCtrlNone",
+      "value": "0.650",
+      "description": "Qwen 7B raw Spearman",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.none"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qSevenCtrlSoftmax",
+      "value": "0.236",
+      "description": "Qwen 7B softmax only",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.softmax_only"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qSevenCtrlNorm",
+      "value": "0.646",
+      "description": "Qwen 7B norm only",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.norm_only"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qSevenCtrlStd",
+      "value": "0.240",
+      "description": "Qwen 7B softmax + norm",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.standard"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qSevenCtrlEntropy",
+      "value": "0.103",
+      "description": "Qwen 7B + entropy",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.plus_entropy"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qSevenCtrlNonlin",
+      "value": "0.259",
+      "description": "Qwen 7B nonlinear MLP",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.nonlinear"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pyFourTenCtrlNone",
+      "value": "0.175",
+      "description": "Pythia~410M raw Spearman",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-410m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.none"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pyFourTenCtrlSoftmax",
+      "value": "0.092",
+      "description": "Pythia~410M softmax only",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-410m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.softmax_only"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pyFourTenCtrlNorm",
+      "value": "0.212",
+      "description": "Pythia~410M norm only",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-410m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.norm_only"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pyFourTenCtrlStd",
+      "value": "0.107",
+      "description": "Pythia~410M softmax + norm",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-410m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.standard"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pyFourTenCtrlEntropy",
+      "value": "0.035",
+      "description": "Pythia~410M + entropy",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-410m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.plus_entropy"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pyFourTenCtrlNonlin",
+      "value": "0.120",
+      "description": "Pythia~410M nonlinear MLP",
+      "section": "Control sensitivity (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-410m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.nonlinear"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "ffgoodness",
+      "value": "-0.010",
+      "description": "FF goodness pcorr",
+      "section": "Hand-designed baselines (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "5c.ff_goodness.rho"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "actnorm",
+      "value": "-0.002",
+      "description": "activation norm pcorr",
+      "section": "Hand-designed baselines (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "5c.activation_norm.rho"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "gptOcMin",
+      "value": "0.084",
+      "description": "min fixed-bottleneck OC across 4 GPT-2 sizes",
+      "section": "GPT-2 scaling"
+    },
+    {
+      "name": "gptOcMax",
+      "value": "0.151",
+      "description": "max fixed-bottleneck OC across 4 GPT-2 sizes",
+      "section": "GPT-2 scaling"
+    },
+    {
+      "name": "gptDiscardMin",
+      "value": "28",
+      "description": "min OC/pcorr % across 4 GPT-2 sizes",
+      "section": "GPT-2 scaling"
+    },
+    {
+      "name": "gptDiscardMax",
+      "value": "52",
+      "description": "max OC/pcorr % across 4 GPT-2 sizes",
+      "section": "GPT-2 scaling"
+    },
+    {
+      "name": "qHalfpcorr",
+      "value": "0.215",
+      "description": "",
+      "section": "Qwen base scaling",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-0.5b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qwenOcMin",
+      "value": "0.059",
+      "description": "min OC across 6 Qwen base sizes",
+      "section": "Qwen base scaling"
+    },
+    {
+      "name": "qwenOcMax",
+      "value": "0.144",
+      "description": "max OC across 6 Qwen base sizes",
+      "section": "Qwen base scaling"
+    },
+    {
+      "name": "qOneFivepcorr",
+      "value": "0.275",
+      "description": "",
+      "section": "Qwen base scaling",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-1.5b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qThreepcorr",
+      "value": "0.263",
+      "description": "",
+      "section": "Qwen base scaling",
+      "provenance_source": "hand",
+      "source_files": [
+        "qwen2.5-3b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qSevenpcorr",
+      "value": "0.255",
+      "description": "",
+      "section": "Qwen base scaling",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qFourteenpcorr",
+      "value": "0.214",
+      "description": "",
+      "section": "Qwen base scaling",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-14b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qThirtyTwopcorr",
+      "value": "0.237",
+      "description": "",
+      "section": "Qwen base scaling",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-32b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qFourteensagree",
+      "value": "0.851",
+      "description": "Qwen 14B seed agreement, cited in appendix A.2",
+      "section": "Qwen base scaling",
+      "provenance_source": "hand",
+      "source_files": [
+        "qwen2.5-14b_main.json"
+      ],
+      "key_paths": [
+        "seed_agreement.mean"
+      ],
+      "formula": "direct read; 7-seed pairwise Spearman mean"
+    },
+    {
+      "name": "qiHalfpcorr",
+      "value": "0.312",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-0.5b-instruct_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qiHalfdelta",
+      "value": "0.097",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-0.5b-instruct_main.json",
+        "qwen2.5-0.5b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean",
+        "partial_corr.mean"
+      ],
+      "formula": "difference: a - b"
+    },
+    {
+      "name": "qiOneFivepcorr",
+      "value": "0.266",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-1.5b-instruct_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qiOneFivedelta",
+      "value": "-0.009",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-1.5b-instruct_main.json",
+        "qwen2.5-1.5b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean",
+        "partial_corr.mean"
+      ],
+      "formula": "difference: a - b"
+    },
+    {
+      "name": "qiThreepcorr",
+      "value": "0.265",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-3b-instruct_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qiThreedelta",
+      "value": "0.002",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-3b-instruct_main.json",
+        "qwen2.5-3b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean",
+        "partial_corr.mean"
+      ],
+      "formula": "difference: a - b"
+    },
+    {
+      "name": "qiSevenpcorr",
+      "value": "0.291",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b-instruct_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qiSevendelta",
+      "value": "0.035",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b-instruct_main.json",
+        "qwen2.5-7b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean",
+        "partial_corr.mean"
+      ],
+      "formula": "difference: a - b"
+    },
+    {
+      "name": "mistralSevenpcorr",
+      "value": "0.313",
+      "description": "Mistral~7B base pcorr",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "mistral-7b-v0.3_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "mistralSevenIpcorr",
+      "value": "0.339",
+      "description": "Mistral~7B Instruct pcorr",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "mistral-7b-instruct-v0.3_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "mistralSevenIdelta",
+      "value": "0.026",
+      "description": "Mistral~7B instruct delta",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "mistral-7b-instruct-v0.3_main.json",
+        "mistral-7b-v0.3_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean",
+        "partial_corr.mean"
+      ],
+      "formula": "difference: a - b"
+    },
+    {
+      "name": "qiFourteenpcorr",
+      "value": "0.237",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-14b-instruct_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qiFourteendelta",
+      "value": "0.023",
+      "description": "",
+      "section": "Qwen instruct",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-14b-instruct_main.json",
+        "qwen2.5-14b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean",
+        "partial_corr.mean"
+      ],
+      "formula": "difference: a - b"
+    },
+    {
+      "name": "llamapcorr",
+      "value": "0.091",
+      "description": "Llama~3B",
+      "section": "Cross-family (Llama, Gemma, Mistral)",
+      "provenance_source": "hand",
+      "source_files": [
+        "llama-3.2-3b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; 7-seed mean at peak layer"
+    },
+    {
+      "name": "llamaOnepcorr",
+      "value": "0.286",
+      "description": "Llama~1B",
+      "section": "Cross-family (Llama, Gemma, Mistral)",
+      "provenance_source": "hand",
+      "source_files": [
+        "llama-3.2-1b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "llamaOneipcorr",
+      "value": "0.285",
+      "description": "Llama~1B Instruct",
+      "section": "Cross-family (Llama, Gemma, Mistral)",
+      "provenance_source": "auto",
+      "source_files": [
+        "llama-3.2-1b-instruct_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "llamaEightpcorr",
+      "value": "0.093",
+      "description": "Llama~8B",
+      "section": "Cross-family (Llama, Gemma, Mistral)",
+      "provenance_source": "hand",
+      "source_files": [
+        "llama-3.1-8b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "gemmapcorr",
+      "value": "0.216",
+      "description": "Gemma 1B",
+      "section": "Cross-family (Llama, Gemma, Mistral)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gemma-3-1b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "gemmaFourpcorr",
+      "value": "0.191",
+      "description": "Gemma 4B",
+      "section": "Cross-family (Llama, Gemma, Mistral)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gemma-3-4b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "phipcorr",
+      "value": "0.300",
+      "description": "Phi-3~Mini",
+      "section": "Cross-family (Llama, Gemma, Mistral)",
+      "provenance_source": "hand",
+      "source_files": [
+        "phi-3-mini_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "mistralpcorr",
+      "value": "0.313",
+      "description": "",
+      "section": "Cross-family (Llama, Gemma, Mistral)",
+      "provenance_source": "hand",
+      "source_files": [
+        "mistral-7b-v0.3_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pythiaSeventypcorr",
+      "value": "0.301",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-70m_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pythiaOneSixtypcorr",
+      "value": "0.382",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "hand",
+      "source_files": [
+        "pythia-160m_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; highest healthy in Pythia controlled suite"
+    },
+    {
+      "name": "pythiaFourTenpcorr",
+      "value": "0.105",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "hand",
+      "source_files": [
+        "pythia-410m_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; collapsed configuration (24L/16H, smaller hidden)"
+    },
+    {
+      "name": "pythiaFourTenstd",
+      "value": "0.0009",
+      "description": "",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOnepcorr",
+      "value": "0.246",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-1b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pythiaOneFourpcorr",
+      "value": "0.106",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "hand",
+      "source_files": [
+        "pythia-1.4b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; collapsed configuration (24L/16H)"
+    },
+    {
+      "name": "pythiaOneFourDeduppcorr",
+      "value": "0.100",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-1.4b-deduped_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pythiaTwoEightpcorr",
+      "value": "0.208",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "hand",
+      "source_files": [
+        "pythia-2.8b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; lowest healthy in Pythia controlled suite"
+    },
+    {
+      "name": "pythiaSixNinepcorr",
+      "value": "0.240",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-6.9b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pythiaTwelvepcorr",
+      "value": "0.238",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-12b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pyFourTenOC",
+      "value": "0.043",
+      "description": "Pythia~410M OC residual",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pyOneFourOC",
+      "value": "0.003",
+      "description": "Pythia~1.4B OC residual",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pyOneFourDedOC",
+      "value": "-0.012",
+      "description": "Pythia~1.4B-deduped OC residual",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiahealthyOClo",
+      "value": "0.088",
+      "description": "healthy Pythia OC min",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiahealthyOChi",
+      "value": "0.169",
+      "description": "healthy Pythia OC max",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaSeventyrandom",
+      "value": "0.078",
+      "description": "",
+      "section": "Pythia within-recipe suite",
+      "provenance_source": "auto",
+      "source_files": [
+        "pythia-70m_main.json"
+      ],
+      "key_paths": [
+        "baselines.random_head"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "pythiaSeventyRatio",
+      "value": "3.9",
+      "description": "learned/random ratio",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOneEarliestpcorr",
+      "value": "0.315",
+      "description": "Pythia~1B earliest-checkpoint pcorr",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOneEarliestOC",
+      "value": "0.079",
+      "description": "Pythia~1B earliest-checkpoint OC",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOneFourEarliestpcorr",
+      "value": "0.297",
+      "description": "Pythia~1.4B earliest-checkpoint pcorr",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOneFourEarliestOC",
+      "value": "0.065",
+      "description": "Pythia~1.4B earliest-checkpoint OC",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOneFourMidpcorr",
+      "value": "0.314",
+      "description": "Pythia~1.4B step-1000 pcorr",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOneFourMidOC",
+      "value": "0.113",
+      "description": "Pythia~1.4B step-1000 OC",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOneFinalOC",
+      "value": "0.120",
+      "description": "Pythia~1B final-checkpoint OC",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOnePerplexity",
+      "value": "20.6",
+      "description": "Pythia~1B final-checkpoint perplexity",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaOneFourPerplexity",
+      "value": "18.4",
+      "description": "Pythia~1.4B final-checkpoint perplexity",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaShufflemean",
+      "value": "-0.002",
+      "description": "",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaShufflestd",
+      "value": "0.036",
+      "description": "",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiaShufflez",
+      "value": "3.0",
+      "description": "Gaussian z, sample-std (ddof=1), n=10",
+      "section": "Pythia within-recipe suite"
+    },
+    {
+      "name": "pythiapermp",
+      "value": "0.036",
+      "description": "2-vs-6 exact permutation, 1/28",
+      "section": "Within-Pythia statistical tests",
+      "provenance_source": "hand",
+      "scope": "pythia_controlled_8",
+      "source_files": [
+        "pythia-70m_main.json",
+        "pythia-160m_main.json",
+        "pythia-410m_main.json",
+        "pythia-1b_main.json",
+        "pythia-1.4b_main.json",
+        "pythia-2.8b_main.json",
+        "pythia-6.9b_main.json",
+        "pythia-12b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "exact one-sided permutation p-value: P(observed gap | random 6-vs-2 partition); paired with Mann-Whitney U=0"
+    },
+    {
+      "name": "pythiapermpdedup",
+      "value": "0.012",
+      "description": "3-vs-6 exact permutation with deduped, 1/84",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "pythiaF",
+      "value": "12.03",
+      "description": "one-way F(1,6) within Pythia",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "pythiaFp",
+      "value": "0.013",
+      "description": "one-way F p-value within Pythia",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "pythiaetasq",
+      "value": "0.667",
+      "description": "eta^2 within Pythia",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "pythiaetasqpct",
+      "value": "67",
+      "description": "eta^2 within Pythia, integer %",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "pythiahealthymean",
+      "value": "0.269",
+      "description": "6 healthy mean",
+      "section": "Within-Pythia statistical tests",
+      "provenance_source": "hand",
+      "scope": "pythia_healthy_6",
+      "source_files": [
+        "pythia-70m_main.json",
+        "pythia-160m_main.json",
+        "pythia-1b_main.json",
+        "pythia-2.8b_main.json",
+        "pythia-6.9b_main.json",
+        "pythia-12b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "mean of partial_corr.mean over scope"
+    },
+    {
+      "name": "pythiahealthyminR",
+      "value": "0.21",
+      "description": "6 healthy min, 2dp rounded",
+      "section": "Within-Pythia statistical tests",
+      "provenance_source": "hand",
+      "scope": "pythia_healthy_6",
+      "source_files": [
+        "pythia-70m_main.json",
+        "pythia-160m_main.json",
+        "pythia-1b_main.json",
+        "pythia-2.8b_main.json",
+        "pythia-6.9b_main.json",
+        "pythia-12b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "min over scope, rounded to 2 dp; equals 0.21 from Pythia 2.8B"
+    },
+    {
+      "name": "pythiahealthymaxR",
+      "value": "0.38",
+      "description": "6 healthy max, 2dp rounded",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "pythiacollmean",
+      "value": "0.106",
+      "description": "2 collapsed mean",
+      "section": "Within-Pythia statistical tests",
+      "provenance_source": "hand",
+      "source_files": [
+        "pythia-410m_main.json",
+        "pythia-1.4b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "mean of partial_corr.mean across the 2 collapsed configurations in the 8-size suite"
+    },
+    {
+      "name": "pythialoomingap",
+      "value": "0.101",
+      "description": "min LOO surviving gap",
+      "section": "Within-Pythia statistical tests",
+      "provenance_source": "hand",
+      "scope": "pythia_controlled_8",
+      "source_files": [
+        "pythia-70m_main.json",
+        "pythia-160m_main.json",
+        "pythia-410m_main.json",
+        "pythia-1b_main.json",
+        "pythia-1.4b_main.json",
+        "pythia-2.8b_main.json",
+        "pythia-6.9b_main.json",
+        "pythia-12b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "min over leave-one-out trials of (min(healthy) - max(collapsed)); 9-suite excludes 1.4B-deduped, 8-size LOO"
+    },
+    {
+      "name": "pythiatrilo",
+      "value": "0.100",
+      "description": "three-replication collapse min",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "pythiatrihi",
+      "value": "0.106",
+      "description": "three-replication collapse max",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "pythiatriwidth",
+      "value": "0.006",
+      "description": "three-replication width",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "qwenrangelo",
+      "value": "0.21",
+      "description": "Qwen family min (0.5B-32B)",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "qwenrangehi",
+      "value": "0.28",
+      "description": "Qwen family max (0.5B-32B), rounded via 3dp to match table display",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "qThreeseedlo",
+      "value": "0.225",
+      "description": "Qwen 3B per-seed min",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "qThreeseedhi",
+      "value": "0.288",
+      "description": "Qwen 3B per-seed max",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "llamaseedlo",
+      "value": "0.084",
+      "description": "Llama~3B per-seed min",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "llamaseedhi",
+      "value": "0.102",
+      "description": "Llama~3B per-seed max",
+      "section": "Within-Pythia statistical tests"
+    },
+    {
+      "name": "llamanonlin",
+      "value": "-0.005",
+      "description": "Llama~3B nonlinear control",
+      "section": "Within-Pythia statistical tests",
+      "provenance_source": "auto",
+      "source_files": [
+        "llama-3.2-3b_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.nonlinear"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qSevenCfourWithin",
+      "value": "-0.029",
+      "description": "Qwen 7B C4 within-domain",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "hand",
+      "source_files": [
+        "qwen2.5-7b_main.json"
+      ],
+      "key_paths": [
+        "cross_domain.c4_within"
+      ],
+      "formula": "direct read; C4-train -> C4-test \u03c1partial on Qwen 7B"
+    },
+    {
+      "name": "coreocstd",
+      "value": "0.008",
+      "description": "GPT-2 OC residual std",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "saefeatures",
+      "value": "24{,}576",
+      "description": "SAE feature count (with thin LaTeX space)",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "pythiaobsgap",
+      "value": "0.163",
+      "description": "Pythia healthy - collapsed mean gap",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "hand",
+      "scope": "pythia_controlled_8",
+      "source_files": [
+        "pythia-70m_main.json",
+        "pythia-160m_main.json",
+        "pythia-410m_main.json",
+        "pythia-1b_main.json",
+        "pythia-1.4b_main.json",
+        "pythia-2.8b_main.json",
+        "pythia-6.9b_main.json",
+        "pythia-12b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "min(healthy) - max(collapsed) over the 8-size partition; full-data observed gap"
+    },
+    {
+      "name": "pythiashufmin",
+      "value": "-0.059",
+      "description": "Pythia shuffle per-perm min",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "pythiashufmax",
+      "value": "0.051",
+      "description": "Pythia shuffle per-perm max",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "qFourteenclusterlo",
+      "value": "0.185",
+      "description": "Qwen 14B lower basin mean (4 seeds)",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "qFourteenclusterhi",
+      "value": "0.251",
+      "description": "Qwen 14B upper basin mean (3 seeds)",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "qFourteenseedlo",
+      "value": "0.18",
+      "description": "Qwen 14B min seed, 2dp",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "qFourteenseedhi",
+      "value": "0.25",
+      "description": "Qwen 14B max seed, 2dp",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "topthreeflatness",
+      "value": "0.015",
+      "description": "top-3 layer delta bound",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "topthreeMistral",
+      "value": "0.0006",
+      "description": "Mistral~7B top-3 pcorr range",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "topthreePhi",
+      "value": "0.0009",
+      "description": "Phi-3~Mini top-3 range",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "topthreeqFourteen",
+      "value": "0.0005",
+      "description": "Qwen 14B top-3 range",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "topthreeqThree",
+      "value": "0.004",
+      "description": "Qwen 3B top-3 range",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "topthreellamaOne",
+      "value": "0.004",
+      "description": "Llama~1B top-3 range",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "topthreegptS",
+      "value": "0.009",
+      "description": "GPT-2~124M top-3 range",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "shapconfmin",
+      "value": "-2",
+      "description": "Shapley confidence min, rho x 100",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "shapconfmax",
+      "value": "26",
+      "description": "Shapley confidence max",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "shapentmin",
+      "value": "5",
+      "description": "Shapley entropy min",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "shapentmax",
+      "value": "36",
+      "description": "Shapley entropy max",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "shaptotalpct",
+      "value": "67",
+      "description": "total Shapley-explained",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "shapresidpct",
+      "value": "33",
+      "description": "Shapley unexplained residual",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "pcaOneCosine",
+      "value": "0.002",
+      "description": "PC1 cosine, GPT-2~124M L8",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "pcaTopTenPct",
+      "value": "3.7",
+      "description": "top 10 PCs variance captured, pct",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "residsagree",
+      "value": "0.991",
+      "description": "confidence-residualized mean seed agreement",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "auto",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "5a.mean_seed_agreement"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "cfourretainmin",
+      "value": "45",
+      "description": "min C4 retention pct across cross-domain table",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "cfourretainmax",
+      "value": "75",
+      "description": "max C4 retention pct across cross-domain table",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "phiCfourWithin",
+      "value": "0.223",
+      "description": "Phi-3~Mini C4 within-domain",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "auto",
+      "source_files": [
+        "phi-3-mini_main.json"
+      ],
+      "key_paths": [
+        "cross_domain.c4_within"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "llamaEightCfourWithin",
+      "value": "-0.062",
+      "description": "Llama~8B C4 within-domain",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "hand",
+      "source_files": [
+        "llama-3.1-8b_main.json"
+      ],
+      "key_paths": [
+        "cross_domain.c4_within"
+      ],
+      "formula": "direct read; C4-train -> C4-test \u03c1partial on Llama 8B"
+    },
+    {
+      "name": "rawspearmanlo",
+      "value": "0.25",
+      "description": "raw Spearman min across all models",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "rawspearmanhi",
+      "value": "0.74",
+      "description": "raw Spearman max across all models",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "llamaOneidelta",
+      "value": "-0.001",
+      "description": "Llama~1B instruct - base delta",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "auto",
+      "source_files": [
+        "llama-3.2-1b-instruct_main.json",
+        "llama-3.2-1b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean",
+        "partial_corr.mean"
+      ],
+      "formula": "difference: a - b"
+    },
+    {
+      "name": "testvalmeanabs",
+      "value": "4.6",
+      "description": "mean absolute test-val gap pct",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "testvalmaxabs",
+      "value": "14.1",
+      "description": "max absolute test-val gap pct",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "testvalposmax",
+      "value": "0.006",
+      "description": "max positive test-val delta",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "exdimbelowlo",
+      "value": "0.145",
+      "description": "Qwen 0.5B ex/dim sub-threshold min",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "exdimbelowhi",
+      "value": "0.153",
+      "description": "Qwen 0.5B ex/dim sub-threshold max",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "exdimeight",
+      "value": "0.232",
+      "description": "Qwen 0.5B at 800 ex/dim",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-0.5b_exdim-sweep.json"
+      ],
+      "key_paths": [
+        "ex_dim_sweep.800.multi_seed.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "exdimthousand",
+      "value": "0.248",
+      "description": "Qwen 0.5B at 1000 ex/dim",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-0.5b_exdim-1000.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "exdimOneNinety",
+      "value": "0.134",
+      "description": "Qwen 0.5B at 190 ex/dim (historical pre-v3 reference)",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "pythiacollapseR",
+      "value": "0.10",
+      "description": "Pythia collapse mean, floored to 2dp",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "randbaselineten",
+      "value": "8.1",
+      "description": "GPT-2~124M random baseline @10% flag",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "randbaselinetwenty",
+      "value": "13.0",
+      "description": "GPT-2~124M random baseline @20% flag",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "obsvsrandten",
+      "value": "2.3",
+      "description": "observer minus random @10%",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "obsvsrandtwenty",
+      "value": "1.4",
+      "description": "observer minus random @20%",
+      "section": "Orphan-value macros (appendix / signal)"
+    },
+    {
+      "name": "entropyabsorbpct",
+      "value": "27",
+      "description": "marginal entropy control absorption, pct of standard control",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.standard",
+        "control_sensitivity.plus_entropy"
+      ],
+      "formula": "(standard - plus_entropy) / standard * 100"
+    },
+    {
+      "name": "normonly",
+      "value": "0.514",
+      "description": "norm-only control pcorr",
+      "section": "Orphan-value macros (appendix / signal)",
+      "provenance_source": "auto",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.norm_only"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "crossfamilygap",
+      "value": "2.9",
+      "description": "Qwen 3B / Llama~3B ratio",
+      "section": "Cross-family gap (matched 3B scale)"
+    },
+    {
+      "name": "nmodels",
+      "value": "14",
+      "description": "models in cross-family F-test scope (Pythia excluded)",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "nfamilies",
+      "value": "6",
+      "description": "families in cross-family F-test scope",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "permF",
+      "value": "15.81",
+      "description": "Monte Carlo 50k, 14 models, 6 families",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "permp",
+      "value": "0.003",
+      "description": "",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "etasq",
+      "value": "0.91",
+      "description": "eta-squared from permutation test",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "etasqpct",
+      "value": "91",
+      "description": "eta-squared as integer percentage",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "etasqlo",
+      "value": "0.52",
+      "description": "eta^2 bootstrap 95% CI lower",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "etasqhi",
+      "value": "0.99",
+      "description": "eta^2 bootstrap 95% CI upper",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "loofweakestfamily",
+      "value": "GPT-2",
+      "description": "family whose removal yields largest leave-one-out p",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "loofweakestp",
+      "value": "0.024",
+      "description": "largest leave-one-family-out p",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "loofgemma",
+      "value": "0.011",
+      "description": "leave-one-out p without Gemma",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "loofllama",
+      "value": "0.006",
+      "description": "leave-one-out p without Llama",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "loofmaxp",
+      "value": "0.024",
+      "description": "all leave-one-out p-values below this",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "confabsorbmean",
+      "value": "60.3",
+      "description": "confidence absorption mean, cross-family scope",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "hand",
+      "scope": "absorption_cohort_14",
+      "source_files": [
+        "gpt2-124m_main.json",
+        "qwen2.5-0.5b_main.json",
+        "qwen2.5-1.5b_main.json",
+        "qwen2.5-3b_main.json",
+        "qwen2.5-7b_main.json",
+        "qwen2.5-14b_main.json",
+        "qwen2.5-32b_main.json",
+        "llama-3.2-1b_main.json",
+        "llama-3.2-3b_main.json",
+        "llama-3.1-8b_main.json",
+        "gemma-3-1b_main.json",
+        "gemma-3-4b_main.json",
+        "mistral-7b-v0.3_main.json",
+        "phi-3-mini_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.none",
+        "control_sensitivity.standard"
+      ],
+      "formula": "mean over scope of (none - standard) / none * 100"
+    },
+    {
+      "name": "confabsorbstd",
+      "value": "7.0",
+      "description": "confidence absorption std, cross-family scope",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "hand",
+      "scope": "absorption_cohort_14",
+      "source_files": [
+        "gpt2-124m_main.json",
+        "qwen2.5-0.5b_main.json",
+        "qwen2.5-1.5b_main.json",
+        "qwen2.5-3b_main.json",
+        "qwen2.5-7b_main.json",
+        "qwen2.5-14b_main.json",
+        "qwen2.5-32b_main.json",
+        "llama-3.2-1b_main.json",
+        "llama-3.2-3b_main.json",
+        "llama-3.1-8b_main.json",
+        "gemma-3-1b_main.json",
+        "gemma-3-4b_main.json",
+        "mistral-7b-v0.3_main.json",
+        "phi-3-mini_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.none",
+        "control_sensitivity.standard"
+      ],
+      "formula": "sample std (ddof=1) over scope of (none - standard) / none * 100"
+    },
+    {
+      "name": "confabsorbmin",
+      "value": "43.8",
+      "description": "min absorption, cross-family scope",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "hand",
+      "scope": "absorption_cohort_14",
+      "source_files": [
+        "gpt2-124m_main.json",
+        "qwen2.5-0.5b_main.json",
+        "qwen2.5-1.5b_main.json",
+        "qwen2.5-3b_main.json",
+        "qwen2.5-7b_main.json",
+        "qwen2.5-14b_main.json",
+        "qwen2.5-32b_main.json",
+        "llama-3.2-1b_main.json",
+        "llama-3.2-3b_main.json",
+        "llama-3.1-8b_main.json",
+        "gemma-3-1b_main.json",
+        "gemma-3-4b_main.json",
+        "mistral-7b-v0.3_main.json",
+        "phi-3-mini_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.none",
+        "control_sensitivity.standard"
+      ],
+      "formula": "min over scope of (none - standard) / none * 100"
+    },
+    {
+      "name": "confabsorbmax",
+      "value": "75.8",
+      "description": "max absorption, cross-family scope",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "hand",
+      "scope": "absorption_cohort_14",
+      "source_files": [
+        "gpt2-124m_main.json",
+        "qwen2.5-0.5b_main.json",
+        "qwen2.5-1.5b_main.json",
+        "qwen2.5-3b_main.json",
+        "qwen2.5-7b_main.json",
+        "qwen2.5-14b_main.json",
+        "qwen2.5-32b_main.json",
+        "llama-3.2-1b_main.json",
+        "llama-3.2-3b_main.json",
+        "llama-3.1-8b_main.json",
+        "gemma-3-1b_main.json",
+        "gemma-3-4b_main.json",
+        "mistral-7b-v0.3_main.json",
+        "phi-3-mini_main.json"
+      ],
+      "key_paths": [
+        "control_sensitivity.none",
+        "control_sensitivity.standard"
+      ],
+      "formula": "max over scope of (none - standard) / none * 100"
+    },
+    {
+      "name": "nabsorbmodels",
+      "value": "14",
+      "description": "models in cross-family absorption scope",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "hand",
+      "scope": "absorption_cohort_14",
+      "source_files": [
+        "gpt2-124m_main.json",
+        "qwen2.5-0.5b_main.json",
+        "qwen2.5-1.5b_main.json",
+        "qwen2.5-3b_main.json",
+        "qwen2.5-7b_main.json",
+        "qwen2.5-14b_main.json",
+        "qwen2.5-32b_main.json",
+        "llama-3.2-1b_main.json",
+        "llama-3.2-3b_main.json",
+        "llama-3.1-8b_main.json",
+        "gemma-3-1b_main.json",
+        "gemma-3-4b_main.json",
+        "mistral-7b-v0.3_main.json",
+        "phi-3-mini_main.json"
+      ],
+      "key_paths": [],
+      "formula": "len(scope)"
+    },
+    {
+      "name": "ocPcorrSlope",
+      "value": "0.48",
+      "description": "oc_vs_pcorr healthy-cluster fit slope (n=21)",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "gptpcorrLo",
+      "value": "0.29",
+      "description": "GPT-2 family pcorr min (124M-1.5B)",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "gptpcorrHi",
+      "value": "0.30",
+      "description": "GPT-2 family pcorr max (124M-1.5B)",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "jtpct",
+      "value": "55.1",
+      "description": "Jonckheere declining comparisons, Qwen 0.5B-32B",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "jtp",
+      "value": "0.210",
+      "description": "Jonckheere p-value, Qwen 0.5B-32B",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "ancovaFamF",
+      "value": "99.6",
+      "description": "ANCOVA family F-stat",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "ancovaFamdf",
+      "value": "5,91",
+      "description": "ANCOVA family df",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "ancovaFamp",
+      "value": "2.3\\times 10^{-35}",
+      "description": "ANCOVA family p (TeX)",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "ancovaScaleF",
+      "value": "0.09",
+      "description": "ANCOVA log_params F",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "ancovaScaledf",
+      "value": "1,91",
+      "description": "ANCOVA log_params df",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "ancovaScalep",
+      "value": "0.76",
+      "description": "ANCOVA log_params p",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "medqaerrorpct",
+      "value": "40",
+      "description": "MedQA error rate (1 - accuracy)",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "medqaexclcatch",
+      "value": "13.4",
+      "description": "MedQA exclusive catch at 20% flag",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "qwentestlo",
+      "value": "0.200",
+      "description": "Qwen test-split min across 0.5B-7B",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "qwentesthi",
+      "value": "0.255",
+      "description": "Qwen test-split max across 0.5B-7B",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "qThreetest",
+      "value": "0.255",
+      "description": "Qwen 3B test mean",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-3b_main.json"
+      ],
+      "key_paths": [
+        "test_split_comparison.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "llamatestgap",
+      "value": "2.6",
+      "description": "Qwen 3B test / Llama~3B test ratio",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "qOneFivetest",
+      "value": "0.236",
+      "description": "Qwen 1.5B test mean",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-1.5b_main.json"
+      ],
+      "key_paths": [
+        "test_split_comparison.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "qOneFivetestgap",
+      "value": "-14.1",
+      "description": "Qwen 1.5B test-val gap pct",
+      "section": "Statistical tests (computed from data)"
+    },
+    {
+      "name": "llamaOneWiki",
+      "value": "0.286",
+      "description": "Llama~1B WikiText",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "auto",
+      "source_files": [
+        "llama-3.2-1b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "llamaOneCfour",
+      "value": "0.159",
+      "description": "Llama~1B C4 transfer",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "auto",
+      "source_files": [
+        "llama-3.2-1b_main.json"
+      ],
+      "key_paths": [
+        "cross_domain.c4"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "llamaOneCfourWithin",
+      "value": "-0.046",
+      "description": "Llama~1B C4 within",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "auto",
+      "source_files": [
+        "llama-3.2-1b_main.json"
+      ],
+      "key_paths": [
+        "cross_domain.c4_within"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "llamaThreeWiki",
+      "value": "0.091",
+      "description": "Llama~3B WikiText",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "auto",
+      "source_files": [
+        "llama-3.2-3b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "llamaThreeCfour",
+      "value": "0.041",
+      "description": "Llama~3B C4 transfer",
+      "section": "Statistical tests (computed from data)",
+      "provenance_source": "auto",
+      "source_files": [
+        "llama-3.2-3b_main.json"
+      ],
+      "key_paths": [
+        "cross_domain.c4"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "codetransfer",
+      "value": "0.539",
+      "description": "WikiText->code transfer",
+      "section": "Cross-domain transfer (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "cross_domain.domains.code.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "owttransfer",
+      "value": "0.086",
+      "description": "WikiText->OpenWebText transfer",
+      "section": "Cross-domain transfer (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "transformer_observe.json"
+      ],
+      "key_paths": [
+        "cross_domain.domains.openwebtext.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "shufflegptreal",
+      "value": "0.292",
+      "description": "GPT-2 real probe reference",
+      "section": "Signal-section experimental values",
+      "provenance_source": "auto",
+      "source_files": [
+        "gpt-2-124m_shuffle-control.json"
+      ],
+      "key_paths": [
+        "real_pcorr"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "shufflegptmean",
+      "value": "0.014",
+      "description": "GPT-2 shuffle mean",
+      "section": "Signal-section experimental values",
+      "provenance_source": "auto",
+      "source_files": [
+        "gpt-2-124m_shuffle-control.json"
+      ],
+      "key_paths": [
+        "shuffle_mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "shufflegptstd",
+      "value": "0.019",
+      "description": "GPT-2 shuffle std",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "shufflegptz",
+      "value": "15.0",
+      "description": "Gaussian z-score, real vs shuffle null (sample std, n=10)",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "mlpgptlinear",
+      "value": "0.293",
+      "description": "GPT-2 linear probe reference",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "mlpgptfixed",
+      "value": "0.252",
+      "description": "GPT-2~MLP fixed-hp value",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "mlpgptdelta",
+      "value": "-0.042",
+      "description": "GPT-2~MLP minus linear",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "signalspan",
+      "value": "0.011",
+      "description": "span across three GPT-2~124M measurements",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "mlppooldelta",
+      "value": "-0.012",
+      "description": "MLP pooled mean delta across 10 models",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "tostPvalue",
+      "value": "0.014",
+      "description": "paired TOST p-value, n=10 model deltas, margin \u00b10.03",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "tostCIlo",
+      "value": "-0.025",
+      "description": "90% CI lower bound on pooled mean delta",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "tostCIhi",
+      "value": "0.001",
+      "description": "90% CI upper bound on pooled mean delta",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "tostNmodels",
+      "value": "10",
+      "description": "TOST pool size",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "mlpsweptmin",
+      "value": "0.014",
+      "description": "swept MLP advantage min",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "mlpsweptmax",
+      "value": "0.067",
+      "description": "swept MLP advantage max",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "pyfourtenlinear",
+      "value": "0.132",
+      "description": "Pythia~410M linear (collapse point)",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "pyfourtenmlp",
+      "value": "0.148",
+      "description": "Pythia~410M swept MLP (collapse point)",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "pyonefourlinear",
+      "value": "0.134",
+      "description": "Pythia~1.4B linear (collapse point)",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "pyonefourmlp",
+      "value": "0.179",
+      "description": "Pythia~1.4B swept MLP (collapse point)",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "llamaThreeNLlin",
+      "value": "0.088",
+      "description": "Llama~3B linear test at L0",
+      "section": "Signal-section experimental values",
+      "provenance_source": "hand",
+      "source_files": [
+        "llama-3.2-3b_nonlinear-probe.json"
+      ],
+      "key_paths": [
+        "swept_hp_holdout.linear_test_mean"
+      ],
+      "formula": "direct read; held-out test split with HP selected on validation"
+    },
+    {
+      "name": "llamaThreeNLmlp",
+      "value": "0.102",
+      "description": "Llama~3B swept MLP test at L0",
+      "section": "Signal-section experimental values",
+      "provenance_source": "hand",
+      "source_files": [
+        "llama-3.2-3b_nonlinear-probe.json"
+      ],
+      "key_paths": [
+        "swept_hp_holdout.best_mlp_test_mean"
+      ],
+      "formula": "direct read; swept-HP MLP, HP selected on validation, evaluated on test"
+    },
+    {
+      "name": "llamaThreeLastlin",
+      "value": "0.104",
+      "description": "Llama~3B L27 linear",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "llamaThreeLastmlp",
+      "value": "0.147",
+      "description": "Llama~3B L27 swept MLP",
+      "section": "Signal-section experimental values"
+    },
+    {
+      "name": "bottlewidthsmall",
+      "value": "0.129",
+      "description": "OC residual at width 64",
+      "section": "Signal-section experimental values",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b_width-sweep.json"
+      ],
+      "key_paths": [
+        "results.width_64.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "bottlewidthlarge",
+      "value": "0.130",
+      "description": "OC residual at width 512",
+      "section": "Signal-section experimental values",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b_width-sweep.json"
+      ],
+      "key_paths": [
+        "results.width_512.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "catchlo",
+      "value": "8.4",
+      "description": "min exclusive catch @10%, Llama~3B",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "catchhi",
+      "value": "11.6",
+      "description": "max exclusive catch @10%, Phi-3~Mini",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "catchratiorange",
+      "value": "1.4",
+      "description": "catch ratio hi/lo",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "pcorrratiorange",
+      "value": "3.3",
+      "description": "rho ratio Phi-3~Mini / Llama~3B",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "catchlomodel",
+      "value": "Llama~3B",
+      "description": "model at catchlo",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "catchhimodel",
+      "value": "Phi-3~Mini",
+      "description": "model at catchhi",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "catchsaturation",
+      "value": "12--15",
+      "description": "catch range @20%, rounded integers",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "nflaggingmodels",
+      "value": "6",
+      "description": "families in flagging scope (13 models)",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "downstreammin",
+      "value": "10.9",
+      "description": "min SQuAD/MedQA @20% exclusive catch",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "downstreammax",
+      "value": "13.4",
+      "description": "max SQuAD/MedQA @20% exclusive catch",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "tqaAUCqwen",
+      "value": "0.499",
+      "description": "Qwen 7B-I confident-wrong AUC",
+      "section": "Architecture-section catch values",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-7b-instruct_truthfulqa.json"
+      ],
+      "key_paths": [
+        "confident_hallucination_catches.auc_among_confident"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "tqaAUCmistral",
+      "value": "0.568",
+      "description": "Mistral~7B-I confident-wrong AUC",
+      "section": "Architecture-section catch values",
+      "provenance_source": "auto",
+      "source_files": [
+        "mistral-7b-instruct-v0.3_truthfulqa.json"
+      ],
+      "key_paths": [
+        "confident_hallucination_catches.auc_among_confident"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "tqaAUCphi",
+      "value": "0.556",
+      "description": "Phi-3~Mini-I confident-wrong AUC",
+      "section": "Architecture-section catch values",
+      "provenance_source": "auto",
+      "source_files": [
+        "phi-3-mini_truthfulqa.json"
+      ],
+      "key_paths": [
+        "confident_hallucination_catches.auc_among_confident"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "varfamily",
+      "value": "85.0",
+      "description": "between families",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "llamacoef",
+      "value": "-0.199",
+      "description": "Llama family coef, cited in architecture.tex",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "scalep",
+      "value": "0.901",
+      "description": "log_params p-value, cited in architecture.tex",
+      "section": "Architecture-section catch values"
+    },
+    {
+      "name": "catchfloor",
+      "value": "8",
+      "description": "min exclusive catch @10%, rounded integer",
+      "section": "Exclusive catch rates (rounded)"
+    },
+    {
+      "name": "catchceiling",
+      "value": "12",
+      "description": "max exclusive catch @10%, rounded integer",
+      "section": "Exclusive catch rates (rounded)"
+    },
+    {
+      "name": "saepcorr",
+      "value": "0.255",
+      "description": "",
+      "section": "SAE comparison (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "gpt-2-124m_sae-comparison.json"
+      ],
+      "key_paths": [
+        "7a.sae.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "saerankcorr",
+      "value": "0.70",
+      "description": "",
+      "section": "SAE comparison (GPT-2~124M)",
+      "provenance_source": "auto",
+      "source_files": [
+        "gpt-2-124m_sae-comparison.json"
+      ],
+      "key_paths": [
+        "7c.mean_rank_correlation"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "bootmean",
+      "value": "0.238",
+      "description": "30-resample mean",
+      "section": "Document-level bootstrap (Qwen 7B)"
+    },
+    {
+      "name": "bootlo",
+      "value": "0.215",
+      "description": "95% CI lower",
+      "section": "Document-level bootstrap (Qwen 7B)"
+    },
+    {
+      "name": "boothi",
+      "value": "0.270",
+      "description": "95% CI upper",
+      "section": "Document-level bootstrap (Qwen 7B)"
+    },
+    {
+      "name": "budgetvone",
+      "value": "0.194",
+      "description": "68 ex/dim, cited in appendix B",
+      "section": "Token budget (Qwen 14B v1-v3 progression)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-14b_main.json"
+      ],
+      "key_paths": [
+        "version_history.v1.partial_corr"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "budgetvthree",
+      "value": "0.214",
+      "description": "350 ex/dim, cited in appendix B",
+      "section": "Token budget (Qwen 14B v1-v3 progression)",
+      "provenance_source": "auto",
+      "source_files": [
+        "qwen2.5-14b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read"
+    },
+    {
+      "name": "exdimSeedStdLow",
+      "value": "0.005",
+      "description": "seed std at 150 ex/dim (Qwen~0.5B), measurement-precise but signal-weak",
+      "section": "Methodology constants"
+    },
+    {
+      "name": "tostMargin",
+      "value": "0.03",
+      "description": "TOST equivalence margin (= 2 x topthreeflatness)",
+      "section": "Methodology constants"
+    },
+    {
+      "name": "xfamCompTol",
+      "value": "0.01",
+      "description": "cross-family pcorr tolerance under layer choice",
+      "section": "Methodology constants"
+    },
+    {
+      "name": "codepathTol",
+      "value": "0.002",
+      "description": "two-pipeline agreement tolerance",
+      "section": "Methodology constants"
+    },
+    {
+      "name": "residGptRef",
+      "value": "0.288",
+      "description": "GPT-2~124M canonical reference",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; canonical reference rho for the residualizer-fit split body table"
+    },
+    {
+      "name": "residGptSplit",
+      "value": "0.288",
+      "description": "GPT-2~124M split-fit pcorr",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_residualizer-split.json"
+      ],
+      "key_paths": [
+        "split_fit.mean"
+      ],
+      "formula": "direct read; rho with OLS residualizer fit on disjoint pool R"
+    },
+    {
+      "name": "residPyOneRef",
+      "value": "0.246",
+      "description": "Pythia~1B canonical reference",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "pythia-1b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; canonical reference rho for Pythia 1B in the body table"
+    },
+    {
+      "name": "residPyOneSplit",
+      "value": "0.263",
+      "description": "Pythia~1B split-fit pcorr",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "pythia-1b_residualizer-split.json"
+      ],
+      "key_paths": [
+        "split_fit.mean"
+      ],
+      "formula": "direct read; rho with OLS residualizer fit on disjoint pool R"
+    },
+    {
+      "name": "residPyOneFourRef",
+      "value": "0.106",
+      "description": "Pythia~1.4B canonical reference",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "pythia-1.4b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; canonical reference rho for Pythia 1.4B in the body table"
+    },
+    {
+      "name": "residPyOneFourSplit",
+      "value": "0.139",
+      "description": "Pythia~1.4B split-fit pcorr",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "pythia-1.4b_residualizer-split.json"
+      ],
+      "key_paths": [
+        "split_fit.mean"
+      ],
+      "formula": "direct read; rho with OLS residualizer fit on disjoint pool R"
+    },
+    {
+      "name": "residLlamaRef",
+      "value": "0.091",
+      "description": "Llama~3.2 3B canonical reference",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "llama-3.2-3b_main.json"
+      ],
+      "key_paths": [
+        "partial_corr.mean"
+      ],
+      "formula": "direct read; canonical reference rho for Llama 3.2 3B in the body table"
+    },
+    {
+      "name": "residLlamaSplit",
+      "value": "0.093",
+      "description": "Llama~3.2 3B split-fit pcorr",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "llama-3.2-3b_residualizer-split.json"
+      ],
+      "key_paths": [
+        "split_fit.mean"
+      ],
+      "formula": "direct read; rho with OLS residualizer fit on disjoint pool R"
+    },
+    {
+      "name": "residSplitMaxDelta",
+      "value": "0.017",
+      "description": "max |split - direct| across 4 models within direct comparison",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_residualizer-split.json",
+        "pythia-1b_residualizer-split.json",
+        "pythia-1.4b_residualizer-split.json",
+        "llama-3.2-3b_residualizer-split.json"
+      ],
+      "key_paths": [
+        "delta_rho"
+      ],
+      "formula": "max |delta_rho| across the 4 residualizer-split JSONs (within direct comparison: split.mean - main.mean)"
+    },
+    {
+      "name": "residSplitNmodels",
+      "value": "4",
+      "description": "models in residualizer-fit split scope",
+      "section": "Residualizer-fit split robustness (signal section + appendix)",
+      "provenance_source": "hand",
+      "source_files": [
+        "gpt2-124m_residualizer-split.json",
+        "pythia-1b_residualizer-split.json",
+        "pythia-1.4b_residualizer-split.json",
+        "llama-3.2-3b_residualizer-split.json"
+      ],
+      "key_paths": [],
+      "formula": "len(residualizer-split source files) = 4"
+    }
+  ]
+}

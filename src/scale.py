@@ -324,7 +324,7 @@ def main():
 
     if args.device == "auto":
         args.device = (
-            "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+            "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
         )
 
     print(f"Scaling study: {len(CONFIGS)} configs x {args.seeds} seed(s)")

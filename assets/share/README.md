@@ -1,8 +1,6 @@
 # Paper figures
 
-_Updated 2026-04-26 for repo v3.3.0._
-
-PNG copies of the seven figures used in the paper and referenced from the repo README. Captions are condensed from the paper PDF; see the paper repo for the full typeset versions.
+PNG copies of the seven figures used in the paper and referenced from the repo README. Captions are condensed from the paper; see the [arXiv PDF](https://arxiv.org/abs/2604.24801) for full typeset versions.
 
 ## Figures
 
@@ -12,7 +10,7 @@ Within-family observability collapse in two training recipes. Left: Llama 3.2/3.
 
 ### `cross_family_scaling.png`
 
-Peak-layer partial correlation across seven families at their default layer. Llama drops from +0.286 at 1B to +0.091 at 3B; the other six families stay flat around +0.29. Shaded band marks the detection threshold. Paper architecture section.
+Peak-layer partial correlation across seven families at their default layer. Llama drops from +0.286 at 1B to +0.091 at 3B; the other six families stay flat around +0.301. Shaded band marks the detection threshold. Paper architecture section.
 
 ### `control_sensitivity_waterfall.png`
 
@@ -20,7 +18,7 @@ Control sensitivity on GPT-2 124M. Cumulative waterfall of raw Spearman plus sof
 
 ### `oc_vs_pcorr.png`
 
-Output-controlled residual versus confidence-controlled partial correlation across 25 models (16 cross-family plus 9 Pythia). Healthy configurations fall on a linear trend (slope 0.88); five collapsed configurations (Llama 3B/8B and three Pythia 24L/16H replications) land near the origin on both axes. Paper Pythia section.
+Output-controlled residual versus confidence-controlled partial correlation across 26 models (17 cross-family plus 9 Pythia). Healthy configurations fall on a linear trend (slope ≈0.80); five collapsed configurations (Llama 3B/8B and three Pythia 24L/16H replications) land near the origin on both axes. Paper Pythia section.
 
 ### `pythia_layers.png`
 
@@ -28,7 +26,7 @@ Pythia layer profiles under held-recipe training. Six healthy configurations pea
 
 ### `downstream_three_model.png`
 
-Exclusive catch rates across three tasks (RAG, MedQA, TruthfulQA) and three production instruct models (Qwen 7B, Phi-3 Mini, Mistral 7B) at 5, 10, and 20 percent flag rates. At 20 percent flag rate, seven of nine cells land in the 11-15 percent ceiling band carried over from the WikiText flagging table. Paper architecture section.
+Exclusive catch rates across three tasks (RAG, MedQA, TruthfulQA) and three production instruct models (Qwen 7B, Phi-3 Mini, Mistral 7B) at 5, 10, and 20 percent flag rates. At 20 percent flag rate, seven of nine cells fall between 10.9 and 13.4 percent (near the WikiText ceiling on GPT-2 124M); the two exceptions are Phi-3 Mini Instruct on SQuAD (6.6 percent) and on MedQA (4.1 percent). Paper architecture section.
 
 ### `exdim_sensitivity.png`
 

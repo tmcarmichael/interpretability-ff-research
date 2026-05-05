@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmcarmichael/nn-observability/schema/legacy.schema.json",
+  "title": "Legacy / phase-taxonomy result file",
+  "description": "Floor schema for historical phase-taxonomy artifacts (transformer_observe.json, *_sae-comparison.json, *_bottleneck-scaling.json, *_exdim-1000.json, *_exdim-sweep.json). These predate the v3+ scope. Required only: a well-formed provenance block. Top-level field shapes vary by phase artifact and are not constrained here.",
+  "type": "object",
+  "required": ["provenance"],
+  "additionalProperties": true,
+  "properties": {
+    "provenance": {"$ref": "#/$defs/provenance"}
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "required": ["model_revision", "script", "timestamp", "device"],
+      "properties": {
+        "model_revision": {"type": "string"},
+        "script": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "value_source": {"type": "string", "enum": ["runtime", "post_hoc_deterministic"]},
+        "device": {"type": "string", "enum": ["cuda", "mps", "cpu"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

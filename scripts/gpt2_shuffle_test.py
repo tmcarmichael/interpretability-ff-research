@@ -5,6 +5,7 @@ layer. Provides a null distribution for partial correlation to confirm the
 real-label signal is not a training artifact.
 """
 
+import datetime as _dt
 import json
 import sys
 import time
@@ -25,7 +26,33 @@ from probe import (
     train_linear_binary,
 )
 
-DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
+
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    if p.is_absolute():
+        return p
+    base = (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+    return base / p
+
+
+OUT_PATH = _resolve_out("gpt-2-124m_shuffle-control.json")
+OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+print(f"Output: {OUT_PATH}")
+
+if not torch.cuda.is_available():
+    import sys
+
+    sys.exit(
+        "gpt2_shuffle_test.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
+MODEL_ID = "openai-community/gpt2"
+MODEL_REVISION = "607a30d7"  # pinned per results/model_revisions.json
 N_PERMUTATIONS = 10
 LAYER = 11  # GPT-2 124M peak layer (hardening layer)
 SEED_BASE = 100  # seeds for permutation RNG (distinct from probe seeds)
@@ -37,10 +64,11 @@ t0 = time.time()
 # Load model
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2")
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, revision=MODEL_REVISION)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
-model = AutoModelForCausalLM.from_pretrained("openai-community/gpt2").to(DEVICE)
+model = AutoModelForCausalLM.from_pretrained(MODEL_ID, revision=MODEL_REVISION).to(DEVICE)
+_resolved_revision = getattr(model.config, "_commit_hash", None) or MODEL_REVISION
 model.eval()
 print(f"Model loaded ({time.time() - t0:.0f}s)")
 
@@ -132,13 +160,14 @@ output = {
     "n_train_positions": len(train_data["losses"]),
     "n_test_positions": len(test_data["losses"]),
     "provenance": {
+        "model_revision": _resolved_revision,
         "script": "scripts/gpt2_shuffle_test.py",
+        "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+        "value_source": "runtime",
         "device": str(DEVICE),
-        "torch_version": torch.__version__,
     },
 }
 
-out_path = Path(__file__).resolve().parent.parent / "results" / "shuffle_test_gpt2.json"
-with open(out_path, "w") as f:
+with open(OUT_PATH, "w") as f:
     json.dump(output, f, indent=2)
-print(f"\nSaved {out_path}")
+print(f"\nSaved {OUT_PATH}")

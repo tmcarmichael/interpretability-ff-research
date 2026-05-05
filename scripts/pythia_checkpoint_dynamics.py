@@ -22,12 +22,15 @@ import gc
 import json
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import torch
 import torch.nn.functional as F
+
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
 from scipy.stats import pearsonr, rankdata, spearmanr
 
 # ── Config ───────────────────────────────────────────────────────────
@@ -84,9 +87,18 @@ LAYER_SELECT_SEED = 42
 EVAL_SEEDS = list(range(43, 50))  # 7 seeds
 OC_SEEDS = list(range(43, 46))  # 3 seeds for r_OC (matches run_model.py)
 
-_OUT_DIR = (
-    Path("/workspace") if Path("/workspace").exists() else Path(__file__).resolve().parent.parent / "results"
-)
+
+def _resolve_out(name_or_path):
+    p = Path(name_or_path)
+    if p.is_absolute():
+        return p
+    base = (
+        Path("/workspace")
+        if Path("/workspace").exists()
+        else Path(__file__).resolve().parent.parent / "results"
+    )
+    return base / p
+
 
 # ── CLI ──────────────────────────────────────────────────────────────
 
@@ -107,13 +119,34 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+# Fail-fast before model download.
+if not RESULTS_DIR.is_dir():
+    sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+manifest = RESULTS_DIR / "model_revisions.json"
+if not manifest.is_file():
+    sys.exit(f"Manifest missing: {manifest}")
+_known = json.loads(manifest.read_text()).get("models", {})
+_keys = list(MODELS.keys()) if args.model == "all" else [args.model]
+for _k in _keys:
+    if MODELS[_k]["id"] not in _known:
+        sys.exit(f"Model {MODELS[_k]['id']!r} not in manifest")
+ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+if not ds_manifest.is_file():
+    sys.exit(f"Dataset manifest missing: {ds_manifest}")
+DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
+
 # ── Setup ────────────────────────────────────────────────────────────
 
 if shutil.which("nvidia-smi"):
     subprocess.run(["nvidia-smi"], check=False)
 
-DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-TRAIN_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+if not torch.cuda.is_available():
+    sys.exit(
+        "pythia_checkpoint_dynamics.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
+TRAIN_DEVICE = "cuda"
 BATCH_SIZE = args.batch_size
 LAYERS_PER_PASS = args.layers_per_pass
 
@@ -181,13 +214,129 @@ def evaluate_head(head, test_data):
     return scores, rho, p
 
 
+def train_oc_predictors(train_activations, train_losses, seeds):
+    """Train MLP loss predictors on output-layer activations, one per seed.
+
+    Returns {seed: cpu Module}. The predictor is the OC component used to
+    augment the confidence/norm covariates when computing the output-controlled
+    residual correlation r_OC.
+    """
+    train_acts = train_activations.to(TRAIN_DEVICE, dtype=torch.float32)
+    train_losses_t = torch.from_numpy(train_losses).float().to(TRAIN_DEVICE)
+    ds = torch.utils.data.TensorDataset(train_acts, train_losses_t)
+    dl = torch.utils.data.DataLoader(ds, batch_size=1024, shuffle=True)
+
+    predictors = {}
+    for seed in seeds:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        pred = torch.nn.Sequential(
+            torch.nn.Linear(train_acts.size(1), 64),
+            torch.nn.ReLU(),
+            torch.nn.Linear(64, 1),
+        ).to(TRAIN_DEVICE)
+        opt = torch.optim.Adam(pred.parameters(), lr=1e-3, weight_decay=1e-4)
+        for _ in range(20):
+            for bx, by in dl:
+                loss = F.mse_loss(pred(bx).squeeze(-1), by)
+                opt.zero_grad(set_to_none=True)
+                loss.backward()
+                opt.step()
+        predictors[seed] = pred.eval().cpu()
+
+    del train_acts, train_losses_t, ds, dl
+    if TRAIN_DEVICE == "cuda":
+        torch.cuda.empty_cache()
+    return predictors
+
+
+def apply_oc_predictors(predictors, val_activations):
+    """Apply each OC predictor to val activations. Returns {seed: np.array}."""
+    val_acts = val_activations.to(dtype=torch.float32)
+    out = {}
+    with torch.inference_mode():
+        for seed, pred in predictors.items():
+            out[seed] = pred(val_acts).squeeze(-1).numpy()
+    del val_acts
+    return out
+
+
+def summarize_layer(per_layer_obs, oc_val_preds):
+    """Build the layer_metrics entry for one layer from cached observer scores
+    and OC predictions.
+
+    Args:
+        per_layer_obs: dict with keys seed_scores (dict {seed: np.array}),
+            losses, max_softmax, activation_norm.
+        oc_val_preds: dict {seed: np.array} of OC predictions on val.
+
+    Returns: dict matching the layer_metrics schema.
+    """
+    seed_scores_dict = per_layer_obs["seed_scores"]
+    losses = per_layer_obs["losses"]
+    sm = per_layer_obs["max_softmax"]
+    norm = per_layer_obs["activation_norm"]
+
+    seeds = sorted(seed_scores_dict.keys())
+    seed_scores = [seed_scores_dict[s] for s in seeds]
+
+    seed_rhos = []
+    for scores in seed_scores:
+        rho, _ = partial_spearman(scores, losses, [sm, norm])
+        seed_rhos.append(float(rho))
+
+    oc_rhos = []
+    for s, scores in zip(seeds, seed_scores):
+        if s in oc_val_preds:
+            r, _ = partial_spearman(scores, losses, [sm, norm, oc_val_preds[s]])
+            oc_rhos.append(float(r))
+
+    if len(seed_scores) > 1:
+        pw = [
+            float(spearmanr(seed_scores[i], seed_scores[j])[0])
+            for i in range(len(seed_scores))
+            for j in range(i + 1, len(seed_scores))
+        ]
+        seed_agreement = float(np.mean(pw))
+    else:
+        seed_agreement = 1.0
+
+    raw_corr = float(spearmanr(seed_scores[0], losses)[0])
+
+    residuals = compute_loss_residuals(losses, sm, norm)
+    target_balance = float(np.mean(residuals > 0))
+
+    return {
+        "partial_corr": {
+            "mean": float(np.mean(seed_rhos)),
+            "std": float(np.std(seed_rhos)),
+            "per_seed": seed_rhos,
+        },
+        "output_controlled": {
+            "mean": float(np.mean(oc_rhos)) if oc_rhos else None,
+            "per_seed": oc_rhos,
+        },
+        "raw_correlation": raw_corr,
+        "seed_agreement": seed_agreement,
+        "activation_norm_mean": float(np.mean(norm)),
+        "activation_norm_std": float(np.std(norm)),
+        "target_balance": target_balance,
+    }
+
+
 # ── Data loading ─────────────────────────────────────────────────────
 
 
 def load_wikitext(split, max_docs=None):
     from datasets import load_dataset
 
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split, streaming=bool(max_docs))
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+        streaming=bool(max_docs),
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -327,26 +476,89 @@ def collect_single_layer(model, batches, layer, max_tokens):
 # ── Sweep + eval ─────────────────────────────────────────────────────
 
 
-def sweep_all_layers(model, train_batches, val_batches, n_layers, max_tokens):
+def sweep_all_layers(model, train_batches, val_batches, n_layers, output_layer, max_tokens):
+    """Layer sweep + per-layer multi-seed observer scores + OC predictor inputs.
+
+    Performs a single-seed probe per layer at LAYER_SELECT_SEED (preserving the
+    legacy ``layer_profile`` schema), trains observer probes at OC_SEEDS for the
+    per-layer heatmap matrix, and saves the output layer's train/val activations
+    for later OC predictor training.
+
+    Returns:
+        layer_profile: {layer: float} (single-seed at LAYER_SELECT_SEED)
+        per_layer_observer: {layer: {seed_scores, losses, max_softmax, activation_norm}}
+        oc_train_inputs: {activations, losses} from the output layer
+        oc_val_inputs: {activations} from the output layer
+    """
     layer_profile = {}
+    per_layer_observer = {}
+    oc_train_inputs = None
+    oc_val_inputs = None
+
     for chunk_start in range(0, n_layers, LAYERS_PER_PASS):
         chunk = list(range(chunk_start, min(chunk_start + LAYERS_PER_PASS, n_layers)))
         tr = collect_multi_layer(model, train_batches, chunk, max_tokens)
         va = collect_multi_layer(model, val_batches, chunk, max_tokens)
+
         for layer in chunk:
-            head = train_linear_binary(tr[layer], seed=LAYER_SELECT_SEED)
-            _, rho, _ = evaluate_head(head, va[layer])
+            tr_layer = tr[layer]
+            va_layer = va[layer]
+
+            # Single-seed layer_profile (backward compat)
+            head = train_linear_binary(tr_layer, seed=LAYER_SELECT_SEED)
+            _, rho, _ = evaluate_head(head, va_layer)
             layer_profile[layer] = float(rho)
+
+            # Multi-seed observer probes for the layer_metrics matrix
+            seed_scores = {}
+            for seed in OC_SEEDS:
+                multi_head = train_linear_binary(tr_layer, seed=seed)
+                multi_head.eval()
+                with torch.inference_mode():
+                    acts_fp32 = va_layer["activations"].to(dtype=torch.float32)
+                    scores = multi_head(acts_fp32).squeeze(-1).numpy()
+                    del acts_fp32
+                seed_scores[seed] = scores
+
+            per_layer_observer[layer] = {
+                "seed_scores": seed_scores,
+                "losses": va_layer["losses"],
+                "max_softmax": va_layer["max_softmax"],
+                "activation_norm": va_layer["activation_norm"],
+            }
+
+            if layer == output_layer:
+                oc_train_inputs = {
+                    "activations": tr_layer["activations"].clone(),
+                    "losses": tr_layer["losses"].copy(),
+                }
+                oc_val_inputs = {
+                    "activations": va_layer["activations"].clone(),
+                }
+
         del tr, va
         gc.collect()
         if DEVICE == "cuda":
             torch.cuda.empty_cache()
-    return layer_profile
+
+    return layer_profile, per_layer_observer, oc_train_inputs, oc_val_inputs
 
 
-def eval_at_peak(model, train_batches, val_batches, peak_layer, output_layer, max_tokens):
-    """Multi-seed eval at peak + r_OC via output layer. Returns eval dict."""
-    # Collect peak + output in one pass
+def eval_at_peak(
+    model,
+    train_batches,
+    val_batches,
+    peak_layer,
+    output_layer,
+    max_tokens,
+    oc_predictors=None,
+):
+    """Multi-seed eval at peak + r_OC via output layer. Returns eval dict.
+
+    If ``oc_predictors`` is provided ({seed: cpu Module}), OC training is
+    skipped and the supplied predictors are applied directly to the output
+    layer's val activations. Otherwise OC predictors are trained inline.
+    """
     layers = sorted(set([peak_layer, output_layer]))
     tr = collect_multi_layer(model, train_batches, layers, max_tokens)
     va = collect_multi_layer(model, val_batches, layers, max_tokens)
@@ -354,11 +566,9 @@ def eval_at_peak(model, train_batches, val_batches, peak_layer, output_layer, ma
     tr_peak, va_peak = tr[peak_layer], va[peak_layer]
     tr_out, va_out = tr[output_layer], va[output_layer]
 
-    # Mean loss (perplexity proxy)
     mean_loss = float(np.mean(va_peak["losses"]))
-    perplexity = float(np.exp(min(mean_loss, 20.0)))  # cap to avoid overflow
+    perplexity = float(np.exp(min(mean_loss, 20.0)))
 
-    # Multi-seed ρ_partial
     seed_rhos, seed_scores = [], []
     for seed in EVAL_SEEDS:
         head = train_linear_binary(tr_peak, seed=seed)
@@ -372,34 +582,12 @@ def eval_at_peak(model, train_batches, val_batches, peak_layer, output_layer, ma
         for j in range(i + 1, len(EVAL_SEEDS))
     ]
 
-    # r_OC: output-controlled residual (3 seeds, matches run_model.py)
-    oc_train_acts = tr_out["activations"].to(TRAIN_DEVICE, dtype=torch.float32)
-    oc_train_losses = torch.from_numpy(tr_out["losses"]).float().to(TRAIN_DEVICE)
-    oc_tds = torch.utils.data.TensorDataset(oc_train_acts, oc_train_losses)
-    oc_tdl = torch.utils.data.DataLoader(oc_tds, batch_size=1024, shuffle=True)
+    if oc_predictors is None:
+        oc_predictors = train_oc_predictors(tr_out["activations"], tr_out["losses"], OC_SEEDS)
+    oc_val_preds = apply_oc_predictors(oc_predictors, va_out["activations"])
 
     oc_rhos = []
     for seed in OC_SEEDS:
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-        pred = torch.nn.Sequential(
-            torch.nn.Linear(oc_train_acts.size(1), 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 1),
-        ).to(TRAIN_DEVICE)
-        opt = torch.optim.Adam(pred.parameters(), lr=1e-3, weight_decay=1e-4)
-        for _ in range(20):
-            for bx, by in oc_tdl:
-                loss = F.mse_loss(pred(bx).squeeze(-1), by)
-                opt.zero_grad(set_to_none=True)
-                loss.backward()
-                opt.step()
-        pred.eval().cpu()
-        with torch.inference_mode():
-            va_out_fp32 = va_out["activations"].to(dtype=torch.float32)
-            ps = pred(va_out_fp32).squeeze(-1).numpy()
-            del va_out_fp32
-
         obs = train_linear_binary(tr_peak, seed=seed)
         obs.eval()
         with torch.inference_mode():
@@ -410,11 +598,11 @@ def eval_at_peak(model, train_batches, val_batches, peak_layer, output_layer, ma
         r, _ = partial_spearman(
             os_,
             va_peak["losses"],
-            [va_peak["max_softmax"], va_peak["activation_norm"], ps],
+            [va_peak["max_softmax"], va_peak["activation_norm"], oc_val_preds[seed]],
         )
         oc_rhos.append(float(r))
 
-    del oc_train_acts, oc_train_losses, oc_tds, tr, va
+    del tr, va
     gc.collect()
     if DEVICE == "cuda":
         torch.cuda.empty_cache()
@@ -445,8 +633,8 @@ def run_model(model_key, model_cfg):
     max_tokens = EX_DIM * hidden_dim
     output_layer = n_layers - 1
 
-    slug = model_key.replace("-", "_").replace(".", "")
-    output_path = _OUT_DIR / f"{slug}_dynamics_results.json"
+    output_path = _resolve_out(f"{model_key}_dynamics.json")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Resume: load existing results if present
     existing = {}
@@ -507,14 +695,21 @@ def run_model(model_key, model_cfg):
             model_id, revision=rev, dtype=torch.bfloat16, attn_implementation="sdpa"
         ).to(DEVICE)
         model.eval()
-        _revision = getattr(model.config, "_commit_hash", None) or "unknown"
+        _revision = getattr(model.config, "_commit_hash", None)
+        if not _revision:
+            raise RuntimeError(
+                f"Could not resolve model revision for {model_id} at revision {rev}: "
+                "upgrade transformers (model.config._commit_hash unset)."
+            )
         load_time = time.time() - t0
         print(f"  Model loaded in {load_time:.0f}s")
 
-        # Phase 1: layer sweep
-        print(f"  Sweeping {n_layers} layers...")
+        # Layer sweep + per-layer multi-seed observer scores + OC inputs
+        print(f"  Sweeping {n_layers} layers (single + multi-seed observers)...")
         t0 = time.time()
-        layer_profile = sweep_all_layers(model, train_batches, val_batches, n_layers, max_tokens)
+        layer_profile, per_layer_observer, oc_train_inputs, oc_val_inputs = sweep_all_layers(
+            model, train_batches, val_batches, n_layers, output_layer, max_tokens
+        )
         sweep_time = time.time() - t0
         print(f"  Sweep done in {sweep_time:.0f}s")
 
@@ -528,11 +723,44 @@ def run_model(model_key, model_cfg):
                 peak = max(mid, key=mid.get)
         print(f"  Peak: L{peak} = {layer_profile[peak]:+.4f}")
 
-        # Phase 2: multi-seed eval at peak + r_OC + perplexity
-        print(f"  Multi-seed eval + r_OC at L{peak} (output L{output_layer})...")
+        # Train shared OC predictors at the output layer (reused for
+        # both per-layer rOC and the canonical 7-seed peak rOC)
+        print(f"  Training OC predictors at L{output_layer}...")
         t0 = time.time()
-        eval_result = eval_at_peak(model, train_batches, val_batches, peak, output_layer, max_tokens)
+        oc_predictors = train_oc_predictors(
+            oc_train_inputs["activations"], oc_train_inputs["losses"], OC_SEEDS
+        )
+        oc_val_preds = apply_oc_predictors(oc_predictors, oc_val_inputs["activations"])
+        oc_time = time.time() - t0
+        print(f"  OC predictors trained in {oc_time:.0f}s")
+
+        # Per-layer metrics matrix using cached observer scores + OC preds
+        layer_metrics = {
+            layer: summarize_layer(obs, oc_val_preds) for layer, obs in per_layer_observer.items()
+        }
+
+        # Free per-layer observer + OC inputs (predictors retained for eval_at_peak)
+        del per_layer_observer, oc_val_preds, oc_train_inputs, oc_val_inputs
+        gc.collect()
+
+        # Canonical 7-seed eval at peak (reuse OC predictors)
+        print(f"  7-seed eval at L{peak} (output L{output_layer})...")
+        t0 = time.time()
+        eval_result = eval_at_peak(
+            model,
+            train_batches,
+            val_batches,
+            peak,
+            output_layer,
+            max_tokens,
+            oc_predictors=oc_predictors,
+        )
         eval_time = time.time() - t0
+
+        del oc_predictors
+        gc.collect()
+        if DEVICE == "cuda":
+            torch.cuda.empty_cache()
 
         pc = eval_result["partial_corr"]
         oc = eval_result["output_controlled"]
@@ -555,6 +783,7 @@ def run_model(model_key, model_cfg):
             "tokens_seen": tokens_seen,
             "revision": _revision,
             "layer_profile": {str(k): v for k, v in sorted(layer_profile.items())},
+            "layer_metrics": {str(k): v for k, v in sorted(layer_metrics.items())},
             "peak_layer": peak,
             "peak_layer_frac": round(peak / n_layers, 2),
             "partial_corr": pc,
@@ -564,6 +793,7 @@ def run_model(model_key, model_cfg):
             "timing": {
                 "load_s": round(load_time, 1),
                 "sweep_s": round(sweep_time, 1),
+                "oc_s": round(oc_time, 1),
                 "eval_s": round(eval_time, 1),
             },
         }
@@ -578,10 +808,11 @@ def run_model(model_key, model_cfg):
             "architecture_class": f"{n_layers}L_{model_cfg['heads']}H",
             "expected_status": model_cfg["status"],
             "provenance": {
+                "model_revision": "multi",
                 "script": "scripts/pythia_checkpoint_dynamics.py",
-                "timestamp": _dt.datetime.now(_dt.UTC).isoformat(),
+                "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+                "value_source": "runtime",
                 "device": str(DEVICE),
-                "torch_version": torch.__version__,
             },
             "protocol": {
                 "layer_select_seed": LAYER_SELECT_SEED,

@@ -1,8 +1,13 @@
-"""Verify that inlined probe functions in run_model.py match src/probe.py.
+"""Verify that inlined probe functions in producer scripts match src/probe.py.
 
-run_model.py inlines core functions for GPU portability (no local imports).
-This test catches drift between the two copies by running both on the same
-synthetic data and asserting identical output.
+The standalone-runnable producer design inlines core probe functions
+instead of importing them. This test catches drift between the
+src/probe.py reference and every script that inlines partial_spearman or
+compute_loss_residuals, by compiling both copies and running them on the
+same synthetic data.
+
+Auto-discovery: any script under scripts/ that defines `def partial_spearman(`
+or `def compute_loss_residuals(` is parametrized in.
 """
 
 import sys
@@ -13,10 +18,17 @@ import pytest
 from scipy.stats import pearsonr, rankdata
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+DRIFT_FUNCS = ("partial_spearman", "compute_loss_residuals")
+
+DRIFT_EXEMPT = {
+    # MPS-only dev scripts return rho directly, not (rho, p).
+    ("mistral7b_instruct_full_mps.py", "partial_spearman"),
+    ("phi3_layer_sweep_mps.py", "partial_spearman"),
+}
 
 
-def _extract_function(filepath: Path, func_name: str) -> str:
-    """Extract a function's source from a file by name."""
+def _extract_function(filepath: Path, func_name: str) -> str | None:
+    """Extract a function's source by name; return None if absent."""
     lines = filepath.read_text().splitlines()
     start = None
     for i, line in enumerate(lines):
@@ -24,8 +36,7 @@ def _extract_function(filepath: Path, func_name: str) -> str:
             start = i
             break
     if start is None:
-        pytest.fail(f"{func_name} not found in {filepath.name}")
-    # Collect lines until next top-level def/class or end of file
+        return None
     func_lines = [lines[start]]
     for line in lines[start + 1 :]:
         if line and not line[0].isspace() and not line.startswith("#"):
@@ -41,13 +52,17 @@ def _compile_function(source: str, name: str):
     return namespace[name]
 
 
-@pytest.fixture(scope="module")
-def run_model_funcs():
-    rm_path = REPO_ROOT / "scripts" / "run_model.py"
-    return {
-        name: _compile_function(_extract_function(rm_path, name), name)
-        for name in ["partial_spearman", "compute_loss_residuals"]
-    }
+def _discover_inlined_scripts() -> list[tuple[Path, str]]:
+    """Return (script_path, func_name) pairs for every script that inlines
+    a drift-checked function, excluding entries in DRIFT_EXEMPT."""
+    pairs: list[tuple[Path, str]] = []
+    for script in sorted((REPO_ROOT / "scripts").glob("*.py")):
+        for func in DRIFT_FUNCS:
+            if (script.name, func) in DRIFT_EXEMPT:
+                continue
+            if _extract_function(script, func) is not None:
+                pairs.append((script, func))
+    return pairs
 
 
 @pytest.fixture(scope="module")
@@ -55,10 +70,7 @@ def probe_funcs():
     sys.path.insert(0, str(REPO_ROOT / "src"))
     import probe
 
-    return {
-        "partial_spearman": probe.partial_spearman,
-        "compute_loss_residuals": probe.compute_loss_residuals,
-    }
+    return {name: getattr(probe, name) for name in DRIFT_FUNCS}
 
 
 @pytest.fixture(scope="module")
@@ -72,30 +84,39 @@ def synthetic_data():
     return losses, max_softmax, activation_norm, probe_scores
 
 
-def test_partial_spearman_sync(run_model_funcs, probe_funcs, synthetic_data):
-    """partial_spearman must produce identical output in both copies."""
+_DRIFT_PAIRS = _discover_inlined_scripts()
+
+
+@pytest.mark.parametrize(
+    "script_path,func_name",
+    _DRIFT_PAIRS,
+    ids=[f"{p.name}::{f}" for p, f in _DRIFT_PAIRS],
+)
+def test_inlined_function_matches_probe(script_path, func_name, probe_funcs, synthetic_data):
+    """Every inlined copy of a drift-checked probe function must produce
+    identical output to src/probe.py on the same synthetic input.
+    """
+    src_text = _extract_function(script_path, func_name)
+    inlined = _compile_function(src_text, func_name)
+    reference = probe_funcs[func_name]
     losses, max_softmax, activation_norm, probe_scores = synthetic_data
-    covariates = [max_softmax, activation_norm]
 
-    r_src, p_src = probe_funcs["partial_spearman"](probe_scores, losses, covariates)
-    r_rm, p_rm = run_model_funcs["partial_spearman"](probe_scores, losses, covariates)
-
-    assert r_src == pytest.approx(r_rm, abs=1e-12), (
-        f"partial_spearman drift: src/probe.py={r_src}, scripts/run_model.py={r_rm}"
-    )
-    assert p_src == pytest.approx(p_rm, abs=1e-12)
-
-
-def test_compute_loss_residuals_sync(run_model_funcs, probe_funcs, synthetic_data):
-    """compute_loss_residuals must produce identical output in both copies."""
-    losses, max_softmax, activation_norm, _ = synthetic_data
-
-    resid_src = probe_funcs["compute_loss_residuals"](losses, max_softmax, activation_norm)
-    resid_rm = run_model_funcs["compute_loss_residuals"](losses, max_softmax, activation_norm)
-
-    np.testing.assert_array_almost_equal(
-        resid_src,
-        resid_rm,
-        decimal=12,
-        err_msg="compute_loss_residuals drift between src/probe.py and scripts/run_model.py",
-    )
+    if func_name == "partial_spearman":
+        covariates = [max_softmax, activation_norm]
+        r_ref, p_ref = reference(probe_scores, losses, covariates)
+        r_inl, p_inl = inlined(probe_scores, losses, covariates)
+        assert r_ref == pytest.approx(r_inl, abs=1e-12), (
+            f"partial_spearman drift in {script_path.name}: ref={r_ref}, inlined={r_inl}"
+        )
+        assert p_ref == pytest.approx(p_inl, abs=1e-12)
+    elif func_name == "compute_loss_residuals":
+        resid_ref = reference(losses, max_softmax, activation_norm)
+        resid_inl = inlined(losses, max_softmax, activation_norm)
+        np.testing.assert_array_almost_equal(
+            resid_ref,
+            resid_inl,
+            decimal=12,
+            err_msg=f"compute_loss_residuals drift in {script_path.name}",
+        )
+    else:
+        pytest.fail(f"unhandled drift function: {func_name}")

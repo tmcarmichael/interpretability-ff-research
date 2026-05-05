@@ -1,0 +1,113 @@
+{
+  "model": "google/gemma-3-1b-pt",
+  "peak_layer": 11,
+  "ex_dim": 350,
+  "seeds": [42, 43, 44],
+  "hidden_dim": 1152,
+  "provenance": {
+    "model_revision": "fcf18a2a879aab110ca39f8bffbccd5d49d8eb29",
+    "script": "scripts/nonlinear_probe.py",
+    "timestamp": "2026-05-04T06:51:35+00:00",
+    "value_source": "runtime",
+    "device": "cuda"
+  },
+  "protocol": {
+    "peak_layer": 11,
+    "ex_dim": 350,
+    "seeds": [42, 43, 44],
+    "batch_size": 16
+  },
+  "fixed_hp": {
+    "per_seed": [
+      {
+        "seed": 42,
+        "linear": 0.17182133677271766,
+        "mlp_64": 0.19703129869440766,
+        "mlp_128": 0.1531233228832862,
+        "delta_64": 0.025209961921690005
+      },
+      {
+        "seed": 43,
+        "linear": 0.17595981162388202,
+        "mlp_64": 0.20886940853139346,
+        "mlp_128": 0.1996962432246803,
+        "delta_64": 0.03290959690751144
+      },
+      {
+        "seed": 44,
+        "linear": 0.17758548170790683,
+        "mlp_64": 0.20076359118427306,
+        "mlp_128": 0.17183916151380754,
+        "delta_64": 0.023178109476366227
+      }
+    ],
+    "linear_mean": 0.17512221003483552,
+    "mlp_64_mean": 0.20222143280335805,
+    "delta_mean": 0.027099222768522557
+  },
+  "swept_hp": {
+    "per_seed": [
+      {
+        "seed": 42,
+        "linear": 0.17182133677271766,
+        "best_mlp": 0.19703129869440766,
+        "best_config": "h=64 lr=0.001 ep=50",
+        "delta": 0.025209961921690005
+      },
+      {
+        "seed": 43,
+        "linear": 0.17595981162388202,
+        "best_mlp": 0.20886940853139346,
+        "best_config": "h=64 lr=0.001 ep=50",
+        "delta": 0.03290959690751144
+      },
+      {
+        "seed": 44,
+        "linear": 0.17758548170790683,
+        "best_mlp": 0.20258382413891188,
+        "best_config": "h=128 lr=0.0001 ep=50",
+        "delta": 0.024998342431005044
+      }
+    ],
+    "best_mlp_mean": 0.202828177121571,
+    "delta_mean": 0.027705967086735495
+  },
+  "swept_hp_holdout": {
+    "protocol": "fit on train, select HP on wikitext validation, report on wikitext test",
+    "grid": {
+      "hidden": [64, 128],
+      "lr": [0.01, 0.001, 0.0001],
+      "epochs": [20, 50]
+    },
+    "per_seed": [
+      {
+        "seed": 42,
+        "linear_test": 0.16998089258563776,
+        "best_val_rho": 0.19703129869440766,
+        "best_mlp_test": 0.19185860550774916,
+        "best_config": "h=64 lr=0.001 ep=50",
+        "delta": 0.02187771292211141
+      },
+      {
+        "seed": 43,
+        "linear_test": 0.17427272950282197,
+        "best_val_rho": 0.20886940853139346,
+        "best_mlp_test": 0.20550566210977625,
+        "best_config": "h=64 lr=0.001 ep=50",
+        "delta": 0.031232932606954283
+      },
+      {
+        "seed": 44,
+        "linear_test": 0.17674325625822676,
+        "best_val_rho": 0.20258382413891188,
+        "best_mlp_test": 0.19629841897138944,
+        "best_config": "h=128 lr=0.0001 ep=50",
+        "delta": 0.019555162713162683
+      }
+    ],
+    "linear_test_mean": 0.17366562611556216,
+    "best_mlp_test_mean": 0.19788756219630496,
+    "delta_mean": 0.02422193608074279
+  },
+  "conclusion": "nonlinear_advantage"
+}

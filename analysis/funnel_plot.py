@@ -14,17 +14,17 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import t as t_dist
 
-from analysis.load_results import load_all_models
+from analysis.load_results import SCOPES, load_all_models
 
 fig_dir = Path(__file__).resolve().parent
 
 
-def load_model_stats() -> list[dict]:
+def load_model_stats(scope: str | None = "cross_family_14") -> list[dict]:
     """Return one row per model with mean, std, n_seeds, and SE for the funnel plot.
 
     Drops models with fewer than 2 seeds (no per-seed variance).
     """
-    models_raw = load_all_models(verbose=True)
+    models_raw = load_all_models(verbose=True, scope=scope)
     models = []
     for label, m in models_raw.items():
         pc = m["partial_corr"]
@@ -73,10 +73,10 @@ def eggers_test(
     return beta[1], t_stat, p_value
 
 
-def run() -> None:
+def run(scope: str | None = "cross_family_14") -> None:
     """Print funnel-plot data, run Egger's test, save funnel_plot.pdf to analysis/."""
     print()
-    models = load_model_stats()
+    models = load_model_stats(scope=scope)
     if len(models) < 3:
         print(f"Only {len(models)} models.")
         sys.exit(1)
@@ -120,7 +120,7 @@ def run() -> None:
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots(1, 1, figsize=(5, 4))
-        # Okabe-Ito palette, kept in sync with figures/style.py PALETTE.
+        # Okabe-Ito palette.
         colors = {
             "GPT-2": "#0072B2",
             "Qwen": "#E69F00",
@@ -152,4 +152,9 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    import argparse
+
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--scope", default="cross_family_14", choices=sorted(SCOPES), help="Named model scope.")
+    args = p.parse_args()
+    run(scope=args.scope)

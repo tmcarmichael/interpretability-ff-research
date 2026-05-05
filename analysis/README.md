@@ -1,7 +1,5 @@
 # Analysis scripts
 
-_Updated 2026-04-26 for repo v3.3.0._
-
 CPU-only statistical analysis. All scripts read from `results/` and import model scope from `load_results.py`.
 
 ## Running
@@ -11,6 +9,24 @@ uv run python analysis/run_all.py          # all analysis scripts
 uv run python analysis/load_results.py     # validate results JSON schema
 uv run python analysis/load_results.py --strict  # also check provenance fields
 ```
+
+## Named scopes
+
+Each headline number in the paper applies to a specific subset of models. Pass `--scope <name>` (or `scope=...` from Python) to filter:
+
+| Scope | Models | Reproduces |
+|---|---|---|
+| `cross_family_14` | 4 GPT-2, 6 Qwen (0.5B-32B), Llama-3B, Gemma-1B, Mistral-7B, Phi-3 Mini | Section 5 cross-family permutation test |
+| `control_sensitivity_14` | same 14 (alias) | confidence-control absorption headline |
+| `pythia_controlled_9` | the 9 Pythia base configurations | Pythia controlled-suite within-recipe results |
+| `all` | every model in every family list (no filter) | Equivalent to omitting `--scope` |
+
+Headline-driving scripts default to the paper scope:
+
+- `permutation_test.py` defaults to `cross_family_14`
+- `selectivity.py` defaults to `control_sensitivity_14`
+
+Other scripts default to no scope (all loaded), since they are supplementary or figure-side. Pass `--scope` explicitly to those when reproducing a paper-table number that uses a specific subset.
 
 ## Scripts
 
@@ -39,7 +55,7 @@ uv run python analysis/load_results.py --strict  # also check provenance fields
    ```bash
    just validate-results
    ```
-   The schema checks for required fields: `model`, `partial_corr.mean`, `partial_corr.per_seed` (minimum 3 seeds; v3 protocol uses 7), `output_controlled.mean`, `peak_layer_final` (or `peak_layer`), `peak_layer_frac`, `seed_agreement`, `baselines`. Run with `--strict` to also check provenance fields.
+   The schema checks for required fields: `model`, `partial_corr.mean`, `partial_corr.per_seed` (minimum 3 seeds; the canonical 7-seed protocol uses 7), `output_controlled.mean`, `peak_layer_final` (or `peak_layer`), `peak_layer_frac`, `seed_agreement`, `baselines`. Run with `--strict` to also check provenance fields.
 
 3. Add to analysis scope in `load_results.py`:
    - Add an entry to the appropriate family list (e.g., `QWEN_MODELS`) or create a new family list
@@ -56,11 +72,11 @@ Every full-protocol results file must contain:
   "n_layers": 32,
   "hidden_dim": 3584,
   "provenance": {
-    "model_revision": "abc123...",
+    "model_revision": "0123456789abcdef0123456789abcdef01234567",
     "script": "scripts/run_model.py",
     "timestamp": "2026-04-15T12:00:00+00:00",
-    "device": "cuda",
-    "torch_version": "2.2.0"
+    "value_source": "runtime",
+    "device": "cuda"
   },
   "protocol": {
     "layer_select_seed": 42,

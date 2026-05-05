@@ -67,6 +67,21 @@ class TestDeepMerge:
         merged = _deep_merge(base, update)
         assert merged["5a"]["partial_corrs"] == [0.29, 0.29, 0.29]
 
+    def test_omitted_leaf_in_update_preserves_base_leaf(self):
+        """Leaf omission in `update` keeps the `base` leaf (no clearing).
+
+        This pins the documented contract: a partial rerun merges its own
+        keys into the existing file, but any leaf the rerun does not write
+        keeps its prior value. Stale leaves do not error or warn; callers
+        who want a guaranteed-fresh file must include every leaf or delete
+        the file before save.
+        """
+        base = {"models": {"gpt2": {"pcorr": 0.290, "oc": 0.099}}}
+        update = {"models": {"gpt2": {"pcorr": 0.288}}}  # oc omitted on purpose
+        merged = _deep_merge(base, update)
+        assert merged["models"]["gpt2"]["pcorr"] == 0.288
+        assert merged["models"]["gpt2"]["oc"] == 0.099
+
 
 # ---------------------------------------------------------------------------
 # partial_spearman
@@ -367,10 +382,9 @@ class TestCorrelationSuite:
 class TestRegimeSweep:
     """Verify partial_spearman behaves correctly across accuracy regimes.
 
-    The CIFAR-10 results live in the ~50% accuracy regime where confidence
-    is a weak predictor. This suite checks that partial correlation doesn't
-    produce artifacts when the base predictor varies from near-perfect to
-    near-chance.
+    Near 50% accuracy, confidence is a weak predictor. This suite checks
+    that partial correlation doesn't produce artifacts when the base
+    predictor varies from near-perfect to near-chance.
     """
 
     def _synthetic_regime(self, accuracy, n=3000, seed=42):

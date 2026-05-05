@@ -10,10 +10,10 @@ import sys
 
 import numpy as np
 
-from analysis.load_results import load_all_models, load_per_seed
+from analysis.load_results import SCOPES, load_all_models, load_per_seed
 
 
-def run_mixed_effects() -> None:
+def run_mixed_effects(scope: str | None = "cross_family_14") -> None:
     """Fit a mixed-effects model with random intercepts per model and print results.
 
     Random intercepts per model absorb within-model correlation from shared
@@ -27,7 +27,7 @@ def run_mixed_effects() -> None:
         print("ERROR: needs pandas and statsmodels.")
         sys.exit(1)
 
-    rows = load_per_seed()
+    rows = load_per_seed(scope=scope)
     if len(rows) < 5:
         print(f"Only {len(rows)} observations.")
         sys.exit(1)
@@ -35,8 +35,8 @@ def run_mixed_effects() -> None:
     df = pd.DataFrame(rows, columns=["family", "model", "params_b", "seed_idx", "partial_corr"])
     df["log_params"] = np.log10(df["params_b"])
 
-    print(f"Loaded {len(df)} seed-level observations")
-    load_all_models(verbose=True)
+    print(f"Loaded {len(df)} seed-level observations (scope={scope})")
+    load_all_models(verbose=True, scope=scope)
     print()
 
     # Flag models with n=1 (no seed variance estimable)
@@ -118,4 +118,9 @@ def run_mixed_effects() -> None:
 
 
 if __name__ == "__main__":
-    run_mixed_effects()
+    import argparse
+
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--scope", default="cross_family_14", choices=sorted(SCOPES), help="Named model scope.")
+    args = p.parse_args()
+    run_mixed_effects(scope=args.scope)

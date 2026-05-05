@@ -11,17 +11,27 @@ from collections import defaultdict
 
 import numpy as np
 
-from analysis.load_results import load_all_models, load_control_sensitivity, load_random_head_baselines
+from analysis.load_results import (
+    SCOPES,
+    load_all_models,
+    load_control_sensitivity,
+    load_random_head_baselines,
+)
 
 
-def analyze_selectivity() -> None:
-    """Print random-head baselines and the per-model raw-vs-controlled gap."""
-    load_all_models(verbose=True)
+def analyze_selectivity(scope: str | None = "control_sensitivity_14") -> None:
+    """Print random-head baselines and the per-model raw-vs-controlled gap.
+
+    Args:
+        scope: named model scope from `SCOPES` (default 'control_sensitivity_14'
+            reproduces the paper's 57.7% confidence-absorption headline).
+    """
+    load_all_models(verbose=True, scope=scope)
     print()
 
     # Part 1: Random head baselines
     print("=== Random head baselines (selectivity control) ===")
-    baselines = load_random_head_baselines()
+    baselines = load_random_head_baselines(scope=scope)
     if baselines:
         for name, family, _params, rh in baselines:
             print(f"  {name:<15} {family:<8} random_head = {rh:+.4f}")
@@ -36,7 +46,7 @@ def analyze_selectivity() -> None:
 
     # Part 2: Control gap
     print("=== Control gap: what fraction of raw signal is confidence? ===")
-    models = load_control_sensitivity()
+    models = load_control_sensitivity(scope=scope)
     if not models:
         print("  No control sensitivity data found.")
         return
@@ -92,4 +102,14 @@ def analyze_selectivity() -> None:
 
 
 if __name__ == "__main__":
-    analyze_selectivity()
+    import argparse
+
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--scope",
+        default="control_sensitivity_14",
+        choices=sorted(SCOPES),
+        help="Named model scope (default: %(default)s, reproduces paper 57.7% headline).",
+    )
+    args = p.parse_args()
+    analyze_selectivity(scope=args.scope)

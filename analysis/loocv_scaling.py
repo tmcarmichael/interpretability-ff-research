@@ -7,16 +7,16 @@ from __future__ import annotations
 
 import numpy as np
 
-from analysis.load_results import load_all_models
+from analysis.load_results import SCOPES, load_all_models
 
 
-def load_qwen_models() -> list[tuple[str, float, float]]:
+def load_qwen_models(scope: str | None = "cross_family_14") -> list[tuple[str, float, float]]:
     """Return (label, log10(params_b), pcorr_mean) for each Qwen model.
 
     Drops models without a `partial_corr.mean`. Output is sorted by parameter
     count via the underlying loader's ordering.
     """
-    all_models = load_all_models()
+    all_models = load_all_models(scope=scope)
     models = []
     for label, m in all_models.items():
         if m["family"] != "Qwen":
@@ -27,9 +27,9 @@ def load_qwen_models() -> list[tuple[str, float, float]]:
     return models
 
 
-def run() -> None:
+def run(scope: str | None = "cross_family_14") -> None:
     """Print the leave-one-out CV table and the full regression summary."""
-    models = load_qwen_models()
+    models = load_qwen_models(scope=scope)
     if len(models) < 3:
         print(f"Only {len(models)} Qwen models. Need at least 3.")
         return
@@ -75,4 +75,9 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    import argparse
+
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--scope", default="cross_family_14", choices=sorted(SCOPES), help="Named model scope.")
+    args = p.parse_args()
+    run(scope=args.scope)

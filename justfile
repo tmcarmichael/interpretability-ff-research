@@ -1,4 +1,4 @@
-# Architecture Determines Observability in Transformers
+# Architectural Observability Collapse in Transformers
 # Run `just` to see all available recipes
 
 set dotenv-load := false
@@ -37,20 +37,25 @@ observe-denoise dataset="mnist" seeds=default_seeds epochs=default_epochs device
     uv run src/observe.py --mode denoise --dataset {{dataset}} --epochs {{epochs}} --seeds {{seeds}} --device {{device}}
 
 # Observer head variant sweep (linear vs MLP, regression vs binary)
-observer-variants device=default_device:
+observer-variants:
     uv run src/observer_variants.py
 
 # Cross-seed ranking agreement test
-seed-agreement device=default_device:
+seed-agreement:
     uv run src/seed_agreement.py
 
 # Weight vector analysis for linear binary heads
-inspect-weights device=default_device:
+inspect-weights:
     uv run src/inspect_weights.py
 
 # GPT-2 124M observer heads (direct replication)
 transformer seeds=default_seeds device=default_device:
     uv run --extra transformer src/transformer_observe.py --seeds {{seeds}} --device {{device}}
+
+# ── Historical phase-taxonomy recipes (v1/v2 provenance, not part of v3+ scope) ──
+# These run src/transformer_observe.py with phase-specific flags. They are the
+# audit trail behind results/transformer_observe.json and the GPT-2 era of the
+# project. Kept on purpose; do not delete as dead code.
 
 # Layer sweep across all 12 GPT-2 layers
 transformer-sweep seeds=default_seeds device=default_device:
@@ -96,25 +101,26 @@ hardening device=default_device:
 control-sensitivity seeds=default_seeds device=default_device:
     uv run --extra transformer src/transformer_observe.py --control-sensitivity --seeds {{seeds}} --device {{device}}
 
-# Cross-domain transfer (WikiText → OpenWebText, code)
+# Cross-domain transfer (WikiText to OpenWebText, code)
 cross-domain seeds=default_seeds device=default_device:
     uv run --extra transformer src/transformer_observe.py --cross-domain --seeds {{seeds}} --device {{device}}
 
-# Scale characterization across GPT-2 family (124M → 1.5B)
-phase8 seeds=default_seeds device=default_device:
+# Scale characterization across GPT-2 family (124M to 1.5B)
+gpt2-scale seeds=default_seeds device=default_device:
     uv run --extra transformer src/transformer_observe.py --scale --seeds {{seeds}} --device {{device}}
 
+# Per-family rerun handles for cross-family-all (run individually after a partial failure)
 # Cross-family replication: Llama 3.2 1B
-phase9a seeds=default_seeds device=default_device:
-    uv run --extra transformer src/transformer_observe.py --phase9a --seeds {{seeds}} --device {{device}}
+cross-family-llama seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --cross-family-llama --seeds {{seeds}} --device {{device}}
 
 # Cross-family replication: Qwen 2.5 0.5B + 1.5B
-phase9b seeds=default_seeds device=default_device:
-    uv run --extra transformer src/transformer_observe.py --phase9b --seeds {{seeds}} --device {{device}}
+cross-family-qwen seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --cross-family-qwen --seeds {{seeds}} --device {{device}}
 
 # All cross-family experiments (Llama 1B + Qwen 0.5B + Qwen 1.5B)
-phase9 seeds=default_seeds device=default_device:
-    uv run --extra transformer src/transformer_observe.py --phase9 --seeds {{seeds}} --device {{device}}
+cross-family-all seeds=default_seeds device=default_device:
+    uv run --extra transformer src/transformer_observe.py --cross-family-all --seeds {{seeds}} --device {{device}}
 
 # Mechanistic analysis on Qwen 7B (mean-ablation patching at scale)
 mechanistic-7b device=default_device:
@@ -132,8 +138,8 @@ all device=default_device:
 smoke device=default_device:
     uv run src/train.py --dataset mnist --epochs 5 --seeds 1 --device {{device}}
 
-# Smoke test for run_model.py (GPT-2 124M, CPU)
-smoke-gpu:
+# Smoke test for run_model.py pipeline (GPT-2 124M, CPU)
+smoke-pipeline:
     uv run pytest tests/test_smoke_run_model.py -v
 
 # Run metric tests
@@ -148,10 +154,36 @@ validate-results:
 validate-results-strict:
     uv run python analysis/load_results.py --strict
 
+# Export named scopes from analysis/load_results.py to reports/scopes.json
+export-scopes:
+    uv run python scripts/export_scopes.py
+
+# Check reports/scopes.json matches generated output (content diff)
+check-scopes:
+    uv run python scripts/export_scopes.py --check
+
+# Validate every results/*_main.json and *_dynamics.json against schema/
+validate-schemas:
+    uv run python scripts/validate_schemas.py --strict
+
+# Regenerate croissant.json from results/ and schema/
+croissant:
+    uv run python scripts/generate_croissant.py
+
+# Verify croissant.json matches generator and validates against the Croissant 1.1 spec
+check-croissant:
+    uv run python scripts/generate_croissant.py --check
+    uvx --quiet --from "mlcroissant==1.1.0" mlcroissant validate --jsonld croissant.json
+
+# Export all release-time reports artifacts (scopes; paper_values.json is written by paper-adot)
+export-reports: export-scopes
+
+# Verify all reports/ artifacts match generated output (content diff, no writes)
+check-reports: check-scopes
+
 # Reproduce predecessor MLP work, GPT-2 scaling, and the cross-family sample
-# (Llama 1B + Qwen 0.5B + Qwen 1.5B). Full v3 paper scope (13 cross-family models,
-# 9 Pythia configurations, 3 downstream tasks) runs via scripts/run_model.py; see
-# `just pythia-suite` below and the per-model commands in notebooks/README.md.
+# (Llama 1B + Qwen 0.5B + Qwen 1.5B). Full paper scope runs via
+# scripts/run_model.py; see `just pythia-suite` and `just downstream-all`.
 # Committed results/*.json are the source of truth.
 reproduce device=default_device:
     just train mnist 3 50 {{device}}
@@ -160,25 +192,36 @@ reproduce device=default_device:
     just observe mnist 3 50 {{device}}
     just observe-aux mnist 3 50 {{device}}
     just observe-denoise mnist 3 50 {{device}}
-    just observer-variants {{device}}
-    just seed-agreement {{device}}
-    just inspect-weights {{device}}
+    just observer-variants
+    just seed-agreement
+    just inspect-weights
     just transformer-all 3 {{device}}
     just sae-compare 3 {{device}}
-    just phase8 3 {{device}}
-    just phase9 3 {{device}}
+    just gpt2-scale 3 {{device}}
+    just cross-family-all 3 {{device}}
 
 # Pythia controlled suite (9 configurations, 70M to 12B plus 1.4B-deduped)
+# Runs sequentially. On failure, rerun individual models with: just pythia model=EleutherAI/pythia-410m
 pythia-suite:
-    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-70m --output pythia_70m_results.json
-    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-160m --output pythia_160m_results.json
-    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-410m --output pythia_410m_results.json
-    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-1b --output pythia1b_results.json
-    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-1.4b --output pythia1_4b_results.json
-    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-1.4b-deduped --output pythia_1.4b_deduped_results.json
-    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-2.8b --output pythia_2.8b_results.json
-    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-6.9b --output pythia_6.9b_results.json
-    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-12b --output pythia_12b_results.json
+    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-70m --output pythia-70m_main.json
+    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-160m --output pythia-160m_main.json
+    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-410m --output pythia-410m_main.json
+    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-1b --output pythia-1b_main.json
+    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-1.4b --output pythia-1.4b_main.json
+    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-1.4b-deduped --output pythia-1.4b-deduped_main.json
+    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-2.8b --output pythia-2.8b_main.json
+    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-6.9b --output pythia-6.9b_main.json
+    uv run --extra transformer python scripts/run_model.py --model EleutherAI/pythia-12b --output pythia-12b_main.json
+
+# Run a single Pythia model (for reruns after partial failure)
+pythia model output="":
+    #!/usr/bin/env bash
+    out="{{output}}"
+    if [ -z "$out" ]; then
+        slug=$(echo "{{model}}" | sed 's|.*/||' | tr '[:upper:]' '[:lower:]')
+        out="${slug}_main.json"
+    fi
+    uv run --extra transformer python scripts/run_model.py --model "{{model}}" --output "$out"
 
 # Downstream QA tasks (3 tasks x 3 instruct models = 9 evaluations)
 # Each trains a WikiText probe then evaluates on the downstream task.
@@ -196,18 +239,63 @@ downstream-all:
     just downstream mistralai/Mistral-7B-Instruct-v0.3
     just downstream microsoft/Phi-3-mini-4k-instruct
 
+# Per-token dump for offline held-out fit-split analysis (CUDA required).
+# Produces results/tokens/{slug}_tokens.npz with target, max_softmax, norm,
+# and per-seed observer scores. Pair with `just held-out-fit-split` (CPU).
+dump-tokens model peak_layer ex_dim="350" seeds="43,44,45,46,47,48,49":
+    uv run --extra transformer python scripts/dump_tokens.py \
+        --model {{model}} --peak-layer {{peak_layer}} \
+        --ex-dim {{ex_dim}} --seeds {{seeds}}
+
+# Dump tokens for a representative subset spanning healthy and collapsed
+# configurations under two recipe families plus the Pythia controlled suite.
+# 8 models. Run on a single H100; expect ~1.5-2h end-to-end.
+dump-tokens-suite:
+    just dump-tokens openai-community/gpt2 8
+    just dump-tokens meta-llama/Llama-3.2-1B 13
+    just dump-tokens meta-llama/Llama-3.2-3B 0
+    just dump-tokens Qwen/Qwen2.5-7B 17
+    just dump-tokens mistralai/Mistral-7B-v0.3 22
+    just dump-tokens microsoft/Phi-3-mini-4k-instruct 17
+    just dump-tokens EleutherAI/pythia-1b 10
+    just dump-tokens EleutherAI/pythia-1.4b 17
+
+# Two-fold cross-validated held-out partial-Spearman analysis on dumped
+# tokens (CPU only). Reports in-sample vs held-out delta per model;
+# writes results/held_out_fit_split.json. Pair with `just dump-tokens-suite`.
+held-out-fit-split:
+    uv run python analysis/held_out_split.py
+
 # Install pre-commit hooks (ruff on commit, version check on push)
 install-hooks:
     uv run pre-commit install
     uv run pre-commit install --hook-type pre-push
 
 # Lint all Python (matches CI scope)
-lint:
-    uv run ruff check src/ scripts/ figures/ analysis/
+lint: lint-scripts
+    uv run ruff check src/ scripts/ analysis/
 
 # Auto-format all Python
 fmt:
-    uv run ruff format src/ scripts/ figures/ analysis/
+    uv run ruff format src/ scripts/ analysis/
+
+# Reject f-string interpolation of /workspace/ in producer scripts. The
+# canonical pattern is the _resolve_out helper in scripts/run_model.py
+# (Path("/workspace") if mounted, else repo's results/). Hardcoded
+# interpolation regressed once and silently broke a multi-hour run; this
+# gate prevents recurrence.
+lint-scripts:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    matches=$(grep -n -e 'f"/workspace/' -e "f'/workspace/" scripts/*.py 2>/dev/null || true)
+    if [ -n "$matches" ]; then
+        echo "FAIL: f-string interpolation of /workspace/ detected. Use the canonical"
+        echo "_resolve_out helper from scripts/run_model.py instead."
+        echo ""
+        echo "$matches"
+        exit 1
+    fi
+    echo "OK: no path-bug interpolation patterns in scripts/"
 
 # Type check (analysis API + core library)
 typecheck:
@@ -215,16 +303,20 @@ typecheck:
 
 # Dead code check
 deadcode:
-    uv run vulture src/ analysis/ figures/ scripts/vulture_whitelist.py --min-confidence 90
+    uv run vulture src/ analysis/ scripts/vulture_whitelist.py --min-confidence 90
 
-# Run all checks (lint + format + types + dead code + version + README freshness)
+# Run all checks (lint + format + types + dead code + version + schema + reports parity)
 check:
-    uv run ruff check src/ scripts/ figures/ analysis/
-    uv run ruff format --check src/ scripts/ figures/ analysis/
+    @just lint
+    uv run ruff format --check src/ scripts/ analysis/
     @just typecheck
     @just deadcode
+    @just test
+    @just validate-results-strict
+    @just validate-schemas
+    @just check-croissant
+    @just check-reports
     @just check-version
-    @just check-readme-freshness
 
 # Verify pyproject.toml version matches latest git tag
 check-version:
@@ -241,44 +333,8 @@ check-version:
         echo "  version: $toml_version (matches v$latest_tag)"
     fi
 
-# Verify non-root READMEs reference the current pyproject.toml version
-check-readme-freshness:
-    #!/usr/bin/env bash
-    toml_version=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-    failed=0
-    for readme in analysis/README.md scripts/README.md results/README.md \
-                  notebooks/README.md assets/README.md assets/share/README.md; do
-        if [ ! -f "$readme" ]; then
-            echo "  MISSING: $readme"
-            failed=1
-            continue
-        fi
-        if ! grep -q "for repo v${toml_version}" "$readme"; then
-            current=$(grep -oE "for repo v[0-9]+\.[0-9]+\.[0-9]+" "$readme" | head -1 || echo "(no version line)")
-            echo "  FAIL: $readme says '$current', pyproject.toml is v${toml_version}"
-            failed=1
-        fi
-    done
-    if [ $failed -eq 0 ]; then
-        echo "  READMEs: all pinned to v${toml_version}"
-    else
-        exit 1
-    fi
-
-# Bump version and date in every non-root README (run after reviewing each)
-bump-readme-versions:
-    #!/usr/bin/env bash
-    toml_version=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-    today=$(date +%Y-%m-%d)
-    for readme in analysis/README.md scripts/README.md results/README.md \
-                  notebooks/README.md assets/README.md assets/share/README.md; do
-        [ -f "$readme" ] || continue
-        sed -i.bak -E "s/^_Updated [0-9]{4}-[0-9]{2}-[0-9]{2} for repo v[0-9]+\.[0-9]+\.[0-9]+\._$/_Updated ${today} for repo v${toml_version}._/" "$readme"
-        rm -f "$readme.bak"
-    done
-    echo "  READMEs: bumped to ${today} / v${toml_version}"
-
-# Remove generated results and charts
+# Remove build artifacts and caches
 clean:
-    rm -f results/*.json assets/*.png
-    rm -rf src/__pycache__
+    rm -rf src/__pycache__ analysis/__pycache__ tests/__pycache__
+    rm -rf .pytest_cache .ruff_cache .mypy_cache
+    rm -f .coverage coverage.json

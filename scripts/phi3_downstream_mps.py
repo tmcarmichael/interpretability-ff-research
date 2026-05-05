@@ -689,6 +689,7 @@ def _analyze_selective(results, task, dataset):
 
 
 def main():
+    global PEAK_LAYER
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true", help="10 questions per task, small probe budget")
     parser.add_argument(
@@ -713,7 +714,6 @@ def main():
 
     max_questions = 10 if args.smoke else args.max_questions
     ex_per_dim = args.ex_per_dim or (50 if args.smoke else TARGET_EX_PER_DIM)
-    global PEAK_LAYER
     if args.peak_layer is not None:
         PEAK_LAYER = args.peak_layer
     tasks = [t.strip() for t in args.tasks.split(",") if t.strip()]
@@ -725,7 +725,16 @@ def main():
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+    def _revision_kwargs(model_id):
+        manifest = RESULTS_DIR / "model_revisions.json"
+        if not manifest.exists():
+            return {}
+        commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+        return {"revision": commit} if commit else {}
+
+    _rev_kw = _revision_kwargs(MODEL_ID)
+
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, **_rev_kw)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -736,6 +745,7 @@ def main():
         MODEL_ID,
         dtype=model_dtype,
         attn_implementation=attn_impl,
+        **_rev_kw,
     ).to(DEVICE)
     model.eval()
 

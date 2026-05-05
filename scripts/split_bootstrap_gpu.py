@@ -10,8 +10,12 @@ import gc
 import json
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
+
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
+DATASET_REVISIONS: dict = {}
 
 if shutil.which("nvidia-smi"):
     subprocess.run(["nvidia-smi"], check=False)
@@ -27,7 +31,14 @@ from datasets import load_dataset
 from scipy.stats import pearsonr, rankdata
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+if not torch.cuda.is_available():
+    import sys
+
+    sys.exit(
+        "split_bootstrap_gpu.py produces paper-quality results and requires CUDA. "
+        "Run on a CUDA-enabled host (Colab GPU, runpod, local CUDA box)."
+    )
+DEVICE = "cuda"
 BATCH_SIZE = 48
 print(f"Device: {DEVICE}")
 
@@ -56,7 +67,12 @@ def compute_loss_residuals(losses, max_softmax, activation_norm):
 
 
 def load_wikitext(split="test", max_docs=None):
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+    ds = load_dataset(
+        "Salesforce/wikitext",
+        "wikitext-103-raw-v1",
+        split=split,
+        revision=DATASET_REVISIONS["Salesforce/wikitext"]["commit"],
+    )
     docs, current = [], []
     for row in ds:
         text = row["text"]
@@ -99,6 +115,23 @@ def build_batches(encoded, batch_size):
     return batches
 
 
+def _get_layer_list(model):
+    """Return the nn.ModuleList of transformer layers, architecture-agnostic."""
+    if hasattr(model, "model") and hasattr(model.model, "layers"):
+        return model.model.layers  # Llama, Qwen, Mistral, Phi
+    if hasattr(model, "model") and hasattr(model.model, "language_model"):
+        lm = model.model.language_model
+        if hasattr(lm, "layers"):
+            return lm.layers  # Gemma 3 (multimodal wrapper)
+        if hasattr(lm, "model") and hasattr(lm.model, "layers"):
+            return lm.model.layers
+    if hasattr(model, "gpt_neox") and hasattr(model.gpt_neox, "layers"):
+        return model.gpt_neox.layers  # Pythia, GPT-NeoX
+    if hasattr(model, "transformer") and hasattr(model.transformer, "h"):
+        return model.transformer.h  # GPT-2
+    raise ValueError(f"Unsupported architecture: {type(model).__name__}. Could not find layer list.")
+
+
 def collect_from_batches(model, batches, layer, max_tokens, device):
     """Collect activations from pre-built batches using forward hook."""
     model.eval()
@@ -110,7 +143,7 @@ def collect_from_batches(model, batches, layer, max_tokens, device):
             h = h[0]
         captured["h"] = h
 
-    handle = model.model.layers[layer].register_forward_hook(hook_fn)
+    handle = _get_layer_list(model)[layer].register_forward_hook(hook_fn)
 
     all_acts, all_losses, all_sm, all_norms = [], [], [], []
     total = 0
@@ -206,14 +239,62 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
+    # Fail-fast before model download.
+    if not RESULTS_DIR.is_dir():
+        sys.exit(f"RESULTS_DIR not found: {RESULTS_DIR}")
+    manifest = RESULTS_DIR / "model_revisions.json"
+    if not manifest.is_file():
+        sys.exit(f"Manifest missing: {manifest}")
+    if args.model not in json.loads(manifest.read_text()).get("models", {}):
+        sys.exit(f"Model {args.model!r} not in manifest")
+    ds_manifest = RESULTS_DIR / "dataset_revisions.json"
+    if not ds_manifest.is_file():
+        sys.exit(f"Dataset manifest missing: {ds_manifest}")
+    global DATASET_REVISIONS
+    DATASET_REVISIONS = json.loads(ds_manifest.read_text()).get("datasets", {})
+
+    def _resolve_out(name_or_path):
+        p = Path(name_or_path)
+        if p.is_absolute():
+            return p
+        base = (
+            Path("/workspace")
+            if Path("/workspace").exists()
+            else Path(__file__).resolve().parent.parent / "results"
+        )
+        return base / p
+
+    def _revision_kwargs(model_id):
+        manifest = Path(__file__).resolve().parent.parent / "results" / "model_revisions.json"
+        if not manifest.exists():
+            return {}
+        commit = json.loads(manifest.read_text()).get("models", {}).get(model_id, {}).get("commit")
+        return {"revision": commit} if commit else {}
+
+    model_slug = args.model.split("/")[-1]
+    out_path = _resolve_out(f"split_bootstrap_{model_slug}.json")
+    ckpt_path = _resolve_out(f"split_bootstrap_{model_slug}_checkpoint.json")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    ckpt_path.parent.mkdir(parents=True, exist_ok=True)
+
     print(f"Loading {args.model}...")
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    print(f"Output:     {out_path}")
+    print(f"Checkpoint: {ckpt_path}")
+
+    _rev_kw = _revision_kwargs(args.model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True, **_rev_kw)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
-        args.model, trust_remote_code=True, dtype=torch.bfloat16, attn_implementation="sdpa"
+        args.model, trust_remote_code=True, dtype=torch.bfloat16, attn_implementation="sdpa", **_rev_kw
     ).to(DEVICE)
     model.eval()
+    _resolved_revision = getattr(model.config, "_commit_hash", None)
+    if not _resolved_revision:
+        raise RuntimeError(
+            f"Could not resolve model revision for {args.model}: pin via results/model_revisions.json "
+            "or upgrade transformers (model.config._commit_hash unset)."
+        )
 
     hidden_dim = model.config.hidden_size
     n_layers = model.config.num_hidden_layers
@@ -282,8 +363,7 @@ def main():
             "boot_rhos": boot_rhos,
             "_elapsed": elapsed(),
         }
-        _ckpt_path = Path("/workspace") / f"split_bootstrap_{args.model.split('/')[-1]}_checkpoint.json"
-        with open(_ckpt_path, "w") as f:
+        with open(ckpt_path, "w") as f:
             json.dump(_ckpt, f)
 
     del model
@@ -303,6 +383,8 @@ def main():
     print(f"  Range:       [{boot_rhos.min():+.4f}, {boot_rhos.max():+.4f}]")
     print(f"  Total time:  {elapsed()}")
 
+    import datetime as _dt
+
     out = {
         "model": args.model,
         "peak_layer": peak,
@@ -318,9 +400,14 @@ def main():
             "split variance from seed variance. Seed variance is measured "
             "separately by the 7-seed protocol in the main experiments.",
         },
+        "provenance": {
+            "model_revision": _resolved_revision,
+            "script": "scripts/split_bootstrap_gpu.py",
+            "timestamp": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+            "value_source": "runtime",
+            "device": str(DEVICE),
+        },
     }
-    out_path = Path("/workspace") / f"split_bootstrap_{args.model.split('/')[-1]}.json"
-    out_path.parent.mkdir(exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(out, f, indent=2)
     print(f"Saved {out_path}")

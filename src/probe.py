@@ -24,10 +24,16 @@ from scipy.stats import pearsonr, rankdata, spearmanr  # noqa: F401
 
 
 def load_wikitext(split: str = "test", max_docs: int | None = None) -> list[str]:
-    """Load WikiText-103 documents. Lazy-imports datasets."""
+    """Load WikiText-103 documents. Lazy-imports datasets; pins revision via results/dataset_revisions.json."""
+    import json as _json
+    from pathlib import Path as _Path
+
     from datasets import load_dataset
 
-    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+    _rev = _json.loads(
+        (_Path(__file__).resolve().parents[1] / "results" / "dataset_revisions.json").read_text()
+    )["datasets"]["Salesforce/wikitext"]["commit"]
+    ds = load_dataset("Salesforce/wikitext", "wikitext-103-raw-v1", split=split, revision=_rev)
     docs: list[str] = []
     current: list[str] = []
     for row in ds:
