@@ -1,6 +1,6 @@
 [project]
 name = "nn-observability"
-version = "4.0.0"
+version = "4.0.1"
 description = "Whether activation monitoring can catch high-confidence transformer errors depends on architecture: some configurations preserve a linearly readable signal after controlling for output confidence, while others collapse. Code and data for 26 models across 7 families."
 readme = "README.md"
 license = {text = "MIT"}

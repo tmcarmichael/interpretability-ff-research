@@ -2,6 +2,10 @@
 
 All notable changes to this repository.
 
+## v4.0.1 (2026-05-05)
+
+Untrack `notebooks/`. No code or results changed. v4.0.0 remains the arXiv v2 artifact.
+
 ## v4.0.0 (2026-05-05) — arXiv v2
 
 Companion code release for arXiv v2 of the paper, retitled

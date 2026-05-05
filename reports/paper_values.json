@@ -1,7 +1,7 @@
 {
   "schema_version": "1.2",
   "paper_version": "v4.0.0",
-  "generated_at": "2026-05-05T06:42:08+00:00",
+  "generated_at": "2026-05-05T07:27:22+00:00",
   "generated_from_repo": "paper-adot",
   "generated_from": "export_paper_values.py",
   "source": "data_macros.sty",
